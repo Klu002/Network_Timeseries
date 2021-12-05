@@ -13,12 +13,15 @@ class TransformerModel(nn.Module):
         super().__init__()
         self.model_type = 'Transformer'
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = torch.nn.TransformerEncoderLayer(d_model, nhead, d_hid, dropout)
-        self.transformer_encoder = torch.nn.TransformerEncoder(encoder_layers, nlayers)
+	
+	#Multi-headed self attention layer
+        encoder_layers = nn.TransformerEncoderLayer(d_model, nhead, d_hid, dropout)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
         self.encoder = nn.Embedding(ntoken, d_model)
         self.d_model = d_model
         self.decoder = nn.Linear(d_model, ntoken)
 
+	#Weight Initialization
         initrange = 0.1
         self.encoder.weight.data.uniform_(-initrange, initrange)
         self.decoder.bias.data.zero_()
