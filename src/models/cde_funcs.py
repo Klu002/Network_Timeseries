@@ -1,5 +1,6 @@
 import math 
 import torch 
+<<<<<<< HEAD
 from torch import nn
 import torchcde
 
@@ -13,3 +14,6 @@ class CDEFunc(nn.Module):
 
     def forward(self, x, t):
 
+=======
+import torchcde
+>>>>>>> 3d9761497a59d6e7420d3201634b9d73756bb8ad
