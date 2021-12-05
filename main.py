@@ -30,14 +30,22 @@ def test(model, test_data, interpolation):
 def main():
   #Hyperparameters
   num_epochs = 30
+  interpolation = torchcde.hermite_cubic_coefficients_with_backward_differences()
+  #loss_func =
 
-  #Get Data Here
+  #TODO: Get data here
+  #test_data, train_data = #[FILL IN HERE]
 
   #Initialize Model
   model = NeuralCDE(input_channels=3, hidden_channels=8, output_channels=1)
-
-  #Optimizer
+  
   optimizer = torch.optim.Adam(model.parameters())
+
+  #Train and Test
+  train(model, num_epochs, train_data, optimizer, interpolation, loss_func)
+  acc = test(model, test_data, interpolation)
+
+  print('Test Accuracy: {}'.format(acc))
 
 if __name__ == '__main__':
   main()
