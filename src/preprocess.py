@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+import torch
 import argparse
 
 class LoadInput:
@@ -28,9 +29,15 @@ class LoadInput:
         """
         Load the data into the model reshapes it into [page_views, batch_size, features]
         """
-        train_data = np.reshape(train_data, (len(train_data[0]), len(train_data), 1))
-        val_data = np.reshape(val_data, (len(val_data[0]), len(val_data), 1))
-        test_data = np.reshape(test_data, (len(test_data[0]), len(test_data), 1))
+        train_data = np.reshape(train_data, (len(train_data), len(train_data[0]), 1))
+        train_data = torch.tensor(train_data, dtype=np.float32)
+        train_data = train_data.permute(1, 0, 2)
+        val_data = np.reshape(val_data, (len(val_data), len(val_data[0]), 1))
+        val_data = torch.tensor(val_data, dtype=np.float32)
+        val_data = val_data.permute(1, 0, 2)
+        test_data = np.reshape(test_data, (len(test_data), len(test_data[0]), 1))
+        test_data = torch.tensor(test_data, dtype=np.float32)
+        test_data = test_data.permute(1, 0, 2)
         return train_data, val_data, test_data
     
     def load_labels(self, train_data, val_data, test_data):
@@ -55,12 +62,15 @@ class LoadInput:
         train_time = []
         val_time = []
         test_time = []
-        for data in train_data:
-            train_time.append(np.array([i for i in range(len(data))]))
-        for data in val_data:
-            val_time.append(np.array([i for i in range(len(data))]))
-        for data in test_data:
-            test_time.append(np.array([i for i in range(len(data))]))
+
+        for i in range(len(train_data)):
+            train_time.append(np.array(i for i in range(len(train_data[i]))))
+
+        for i in range(len(val_data)):
+            val_time.append(np.array(i for i in range(len(val_data[i]))))
+
+        for i in range(len(test_data)):
+            test_time.append(np.array(i for i in range(len(test_data[i]))))
         
         train_time = np.reshape(train_time, (len(train_time[0]), len(train_time), 1))
         val_time = np.reshape(val_time, (len(val_time[0]), len(val_time), 1))
@@ -104,8 +114,13 @@ def run():
         train_data, val_data, test_data = ld.split_train_val_test()
         train_data, val_data, test_data = ld.load_data(train_data, val_data, test_data)
         train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
+        print(train_data.shape)
+        print(train_data[0])
+        print(train_time.shape)
+        print(train_time[0])
+        print(train_time[1])
         return train_data, val_data, test_data, train_time, val_time, test_time
-    
+
 
 if __name__ == '__main__':
     run()
