@@ -1,4 +1,4 @@
-from torchdiffeq import odeint as odeint
+from torchdiffeq import ode_adjoint as odeint
 
 class ODEFunc(nn.Module):
     def __init__(self, latent_dim, hidden_dim, time_invariant=False):
@@ -35,5 +35,10 @@ class NeuralODE(nn.Module):
 
         # TODO: pass in t to ODE solver row by row then concatenate
         # output hidden states and pad
+        pred_z = []
+        for i in range(len(t)):
+            t_i = t[i, :, :]
+            pred_z.append(odeint(self.func, z0, t))
+
         pred_z = odeint(self.func, z0, t).permute(1, 0, 2)
         return pred_z

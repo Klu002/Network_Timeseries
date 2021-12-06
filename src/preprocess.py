@@ -7,7 +7,7 @@ import argparse
 class LoadInput:
     def __init__(self, data_path):
         file_path = [
-            'page_views.npy',
+            '/page_views.npy',
         ]
         self.file_path = data_path + file_path[0]
         self.loaded_data = np.load(self.file_path)
@@ -78,7 +78,6 @@ class LoadInput:
 
         return train_time, val_time, test_time
 
-
 def read_data(filename):
     """
     Read data from csv file
@@ -88,39 +87,24 @@ def read_data(filename):
 
     return df, dates
 
-def run():
+def gen_batch(x, t, start_row, end_row, n_sample=100):
     """
-    Main function
+    Generate batches of data
+    Input: x: Data of size (num_timsteps, num_rows, 1)
+           t: Timesteps of size (num_timesteps, num_rows, 1)
+           batch_size: desired batch size
+           n_sample: number of timesteps to sample
+    Output: Data of size (n_sample, batch_size, 1)
+            Timesteps of size (n_sample, batch_size, 1)
     """
-    parser = argparse.ArgumentParser(description='Preprocess data')
-    parser.add_argument('--input', type=str, help='Input file')
-    parser.add_argument('--load', type=str, help='Load data from file')
-    args = parser.parse_args()
-  
-    if args.input:
-        print('Reading data from file')
-        data_path = args.input
-        df, dates = read_data(data_path)
-        if not os.path.exists('data/parsed'):
-            os.makedirs('data/parsed')
-
-        # Saves data
-        np.save('data/parsed/page_views.npy', df[dates].values)
+    time_len = x.shape[0]
+    n_sample = min(n_sample, time_len)
+    if n_sample > 0:
+        t0_idx = np.random.multinomial(1, [1. / (time_len - n_sample)] * (time_len - n_sample))
+        t0_idx = np.argmax(t0_idx)
+        tM_idx = t0_idx + n_sample
+    else:
+        t0_idx = 0
+        tM_idx = time_len
     
-    if args.load:
-        print('Loading data from file')
-        data_path = args.load
-        ld = LoadInput(data_path)
-        train_data, val_data, test_data = ld.split_train_val_test()
-        train_data, val_data, test_data = ld.load_data(train_data, val_data, test_data)
-        train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
-        print(train_data.shape)
-        print(train_data[0])
-        print(train_time.shape)
-        print(train_time[0])
-        print(train_time[1])
-        return train_data, val_data, test_data, train_time, val_time, test_time
-
-
-if __name__ == '__main__':
-    run()
+    return x[t0_idx:tM_idx, start_row:end_row], t[start_row: end_row] 

@@ -80,3 +80,12 @@ class ODEVAE(nn.Module):
 
         x_p = self.decoder(z, t)
         return x_p, z, mu, logvar
+
+def loss_function(x_p, x, z, mu, logvar):
+    reconstruction_loss = 0.5 * ((x - x_p)**2).sum(-1).sum(0)
+    kl_loss = -0.5 * torch.sum(1 + logvar - mu**2 - torch.exp(logvar))
+    
+    loss = reconstruction_loss + kl_loss
+    loss = torch.mean(loss)
+
+    return loss
