@@ -1,12 +1,11 @@
 import os
 import pandas as pd
 import numpy as np
-import argparse
 
 class LoadInput:
     def __init__(self, data_path):
         file_path = [
-            'page_views.npy',
+            '/page_views.npy',
         ]
         self.file_path = data_path + file_path[0]
         self.loaded_data = np.load(self.file_path)
@@ -98,35 +97,3 @@ def gen_batch(x, t, start_row, end_row, n_sample=100):
         tM_idx = time_len
     
     return x[t0_idx:tM_idx, start_row:end_row], t[start_row: end_row] 
-
-def run():
-    """
-    Main function
-    """
-    parser = argparse.ArgumentParser(description='Preprocess data')
-    parser.add_argument('--input', type=str, help='Input file')
-    parser.add_argument('--load', type=str, help='Load data from file')
-    args = parser.parse_args()
-  
-    if args.input:
-        print('Reading data from file')
-        data_path = args.input
-        df, dates = read_data(data_path)
-        if not os.path.exists('data/parsed'):
-            os.makedirs('data/parsed')
-
-        # Saves data
-        np.save('data/parsed/page_views.npy', df[dates].values)
-    
-    if args.load:
-        print('Loading data from file')
-        data_path = args.load
-        ld = LoadInput(data_path)
-        train_data, val_data, test_data = ld.split_train_val_test()
-        train_data, val_data, test_data = ld.load_data(train_data, val_data, test_data)
-        train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
-        return train_data, val_data, test_data, train_time, val_time, test_time
-    
-
-if __name__ == '__main__':
-    run()
