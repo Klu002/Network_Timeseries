@@ -68,7 +68,6 @@ class LoadInput:
 
         return train_time, val_time, test_time
 
-
 def read_data(filename):
     """
     Read data from csv file
@@ -77,6 +76,28 @@ def read_data(filename):
     dates = [i for i in df.columns if i != 'Page']
 
     return df, dates
+
+def gen_batch(x, t, start_row, end_row, n_sample=100):
+    """
+    Generate batches of data
+    Input: x: Data of size (num_timsteps, num_rows, 1)
+           t: Timesteps of size (num_timesteps, num_rows, 1)
+           batch_size: desired batch size
+           n_sample: number of timesteps to sample
+    Output: Data of size (n_sample, batch_size, 1)
+            Timesteps of size (n_sample, batch_size, 1)
+    """
+    time_len = x.shape[0]
+    n_sample = min(n_sample, time_len)
+    if n_sample > 0:
+        t0_idx = np.random.multinomial(1, [1. / (time_len - n_sample)] * (time_len - n_sample))
+        t0_idx = np.argmax(t0_idx)
+        tM_idx = t0_idx + n_sample
+    else:
+        t0_idx = 0
+        tM_idx = time_len
+    
+    return x[t0_idx:tM_idx, start_row:end_row], t[start_row: end_row] 
 
 def run():
     """
