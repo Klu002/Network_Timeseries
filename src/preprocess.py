@@ -1,8 +1,38 @@
 import os
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 import numpy as np
 import argparse
+
+class LoadInput:
+    def __init__(self, data_path):
+        file_path = [
+            'page_views.npy',
+        ]
+        self.file_path = data_path + file_path[0]
+        self.loaded_data = np.load(self.file_path)
+
+    def split_train_val_test(self, train_size=0.6, val_size=0.2, test_size=0.2):
+        """
+        Split the loaded data into train, validation and test data
+        """
+        train_data = []
+        val_data = []
+        test_data = []
+        for data in self.loaded_data:
+            train_data.append(data[:int(len(data) * train_size)])
+            val_data.append(data[int(len(data) * train_size):int(len(data) * (train_size + val_size))])
+            test_data.append(data[int(len(data) * (train_size + val_size)):])
+        return train_data, val_data, test_data
+    
+    def load(self, train_data, val_data, test_data):
+        """
+        Load the data into the model reshapes it into [batch_size, timesteps, features]
+        """
+        train_data = np.reshape(train_data, (len(train_data), len(train_data[0]), 1))
+        val_data = np.reshape(val_data, (len(val_data), len(val_data[0]), 1))
+        test_data = np.reshape(test_data, (len(test_data), len(test_data[0]), 1))
+        return train_data, val_data, test_data
+
 
 def read_data(filename):
     """
@@ -13,54 +43,39 @@ def read_data(filename):
 
     return df, dates
 
-def parse_url(df):
-    """
-    Parse url from Page column
-    """
-    page = df['Page'].str.split('_')
-    df['name'] = page.str[0]
-    df['project'] = page.str[1]
-    df['access'] = page.str[2]
-    df['agent'] = page.str[3]
-
-    return df
-
-def label_encode(df):
-    """
-    Label encode columns
-    """
-    le = LabelEncoder()
-    df['page_url'] = le.fit_transform(df['Page'])
-    df['project'] = le.fit_transform(df['project'])
-    df['access'] = le.fit_transform(df['access'])
-    df['agent'] = le.fit_transform(df['agent'])
-
-    return df
-
 def run():
     """
     Main function
     """
     parser = argparse.ArgumentParser(description='Preprocess data')
     parser.add_argument('--input', type=str, help='Input file')
+    parser.add_argument('--load', type=str, help='Load data from file')
     args = parser.parse_args()
+  
+    if args.input:
+        print('Reading data from file')
+        data_path = args.input
+        df, dates = read_data(data_path)
+        if not os.path.exists('data/parsed'):
+            os.makedirs('data/parsed')
 
-    df, dates = read_data(args.input)
-    df = parse_url(df)
-    df = label_encode(df)
-    train_page_views = df[dates].values
+        # Saves data
+        np.save('data/parsed/page_views.npy', df[dates].values)
     
-    if not os.path.exists('data/parsed'):
-        os.makedirs('data/parsed')
-
-    # Saves a map of the label to the value
-    df[['page_url', 'Page']].to_csv('data/parsed/ids_to_page.csv', index=False)
-    # Saves data
-    np.save('data/parsed/train_page_views.npy', train_page_views)
-    np.save('data/parsed/project_names.npy', df['project'].values)
-    np.save('data/parsed/access_names.npy', df['access'].values)
-    np.save('data/parsed/agent_names.npy', df['agent'].values)
-    np.save('data/parsed/page_names.npy', df['page_url'].values)
+    if args.load:
+        print('Loading data from file')
+        data_path = args.load
+        ld = LoadInput(data_path)
+        train_data, val_data, test_data = ld.split_train_val_test()
+        train_data, val_data, test_data = ld.load(train_data, val_data, test_data)
+        print(train_data.shape)
+        print(val_data.shape)
+        print(test_data.shape)
+        print(train_data[0])
+        print(val_data[0])
+        print(test_data[0])
+        return train_data, val_data, test_data
+    
 
 if __name__ == '__main__':
     run()
