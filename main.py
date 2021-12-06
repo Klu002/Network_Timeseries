@@ -2,11 +2,10 @@ import math
 import torch
 import torchcde
 
-def train(model, num_epochs: int, data, optimizer, interpolation, loss_func):
+def train(model, num_epochs: int, data, optimizer, loss_func):
   train_X, train_Y = data
-  train_coeffs = interpolation(train_X)
 
-  train_dataset = torch.utils.data.TensorDataset(train_coeffs, train_Y)
+  train_dataset = torch.utils.data.TensorDataset(train_X, train_Y)
   train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=32)
 
   for epoch in range(num_epochs):
@@ -19,7 +18,7 @@ def train(model, num_epochs: int, data, optimizer, interpolation, loss_func):
           optimizer.zero_grad()
       print('Epoch: {}   Training loss: {}'.format(epoch, loss.item()))
 
-def test(model, test_data, interpolation):
+def test(model, test_data):
   test_X, test_Y = test_data
   pred = model(test_X).squeeze(-1)
   prediction_matches = (pred == test_Y).to(test_Y.dtype)
@@ -30,7 +29,6 @@ def test(model, test_data, interpolation):
 def main():
   #Hyperparameters
   num_epochs = 30
-  interpolation = torchcde.hermite_cubic_coefficients_with_backward_differences()
   #loss_func =
 
   #TODO: Get data here
@@ -42,8 +40,8 @@ def main():
   optimizer = torch.optim.Adam(model.parameters())
 
   #Train and Test
-  train(model, num_epochs, train_data, optimizer, interpolation, loss_func)
-  acc = test(model, test_data, interpolation)
+  train(model, num_epochs, train_data, optimizer, loss_func)
+  acc = test(model, test_data)
 
   print('Test Accuracy: {}'.format(acc))
 
