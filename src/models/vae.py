@@ -30,6 +30,7 @@ class RNNEncoder(nn.Module):
         xt = torch.cat((x, t), dim=-1)
         xt = xt[::-1]
 
+        # sample from initial encoding
         _, h0 = self.rnn(xt)
         mu = self.mu(h0[0])
         logvar = self.logvar(h0[0])
