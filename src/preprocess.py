@@ -24,14 +24,49 @@ class LoadInput:
             test_data.append(data[int(len(data) * (train_size + val_size)):])
         return train_data, val_data, test_data
     
-    def load(self, train_data, val_data, test_data):
+    def load_data(self, train_data, val_data, test_data):
         """
-        Load the data into the model reshapes it into [batch_size, timesteps, features]
+        Load the data into the model reshapes it into [page_views, batch_size, features]
         """
-        train_data = np.reshape(train_data, (len(train_data), len(train_data[0]), 1))
-        val_data = np.reshape(val_data, (len(val_data), len(val_data[0]), 1))
-        test_data = np.reshape(test_data, (len(test_data), len(test_data[0]), 1))
+        train_data = np.reshape(train_data, (len(train_data[0]), len(train_data), 1))
+        val_data = np.reshape(val_data, (len(val_data[0]), len(val_data), 1))
+        test_data = np.reshape(test_data, (len(test_data[0]), len(test_data), 1))
         return train_data, val_data, test_data
+    
+    def load_labels(self, train_data, val_data, test_data):
+        """
+        Labels are whether page views are increasing or decreasing of size [batch_size, timesteps]
+        """
+        train_labels = []
+        val_labels = []
+        test_labels = []
+        for data in train_data:
+            train_labels.append(np.array([1 if data[i+1] > data[i] else 0 for i in range(len(data)-1)]))
+        for data in val_data:
+            val_labels.append(np.array([1 if data[i+1] > data[i] else 0 for i in range(len(data)-1)]))
+        for data in test_data:
+            test_labels.append(np.array([1 if data[i+1] > data[i] else 0 for i in range(len(data)-1)]))
+        return train_labels, val_labels, test_data
+    
+    def load_time(self, train_data, val_data, test_data):
+        """
+        Load the time data in the shape of [timesteps, batch_size, features]
+        """
+        train_time = []
+        val_time = []
+        test_time = []
+        for data in train_data:
+            train_time.append(np.array([i for i in range(len(data))]))
+        for data in val_data:
+            val_time.append(np.array([i for i in range(len(data))]))
+        for data in test_data:
+            test_time.append(np.array([i for i in range(len(data))]))
+        
+        train_time = np.reshape(train_time, (len(train_time[0]), len(train_time), 1))
+        val_time = np.reshape(val_time, (len(val_time[0]), len(val_time), 1))
+        test_time = np.reshape(test_time, (len(test_time[0]), len(test_time), 1))
+
+        return train_time, val_time, test_time
 
 
 def read_data(filename):
@@ -67,14 +102,9 @@ def run():
         data_path = args.load
         ld = LoadInput(data_path)
         train_data, val_data, test_data = ld.split_train_val_test()
-        train_data, val_data, test_data = ld.load(train_data, val_data, test_data)
-        print(train_data.shape)
-        print(val_data.shape)
-        print(test_data.shape)
-        print(train_data[0])
-        print(val_data[0])
-        print(test_data[0])
-        return train_data, val_data, test_data
+        train_data, val_data, test_data = ld.load_data(train_data, val_data, test_data)
+        train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
+        return train_data, val_data, test_data, train_time, val_time, test_time
     
 
 if __name__ == '__main__':
