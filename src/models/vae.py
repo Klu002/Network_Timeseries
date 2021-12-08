@@ -127,7 +127,7 @@ def mae(device, y_true, y_pred, mask):
     y_true_log = torch.log1p(y_true)
     y_pred_log = torch.log1p(y_pred)
     error = torch.abs(y_true_log - y_pred_log)/2
-
+    
     nvalid = torch.sum(mask)
     error_sum = torch.sum(error * mask) / nvalid
     return error_sum
@@ -137,6 +137,12 @@ def train_smape_loss(device, y_true, y_pred):
     weight_mask = mask.type(torch.FloatTensor)
     
     return differentiable_smape(device, y_true, y_pred, weight_mask)
+
+def train_mae_loss(device, y_true, y_pred):
+    mask = torch.isfinite(y_true).to(device)
+    weight_mask = mask.type(torch.FloatTensor)
+    
+    return mae(device, y_true, y_pred, weight_mask)
 
 def test_smape_loss(device, y_true, y_pred):
     mask = torch.isfinite(y_true).to(device)
