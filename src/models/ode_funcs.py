@@ -1,4 +1,6 @@
-from torchdiffeq import ode_adjoint as odeint
+import torch
+from torch import nn
+from torchdiffeq import odeint_adjoint as odeint
 
 class ODEFunc(nn.Module):
     def __init__(self, latent_dim, hidden_dim, time_invariant=False):
@@ -16,7 +18,7 @@ class ODEFunc(nn.Module):
         self.lin3 = nn.Linear(hidden_dim, latent_dim)
         self.elu = nn.ELU(inplace=True)
 
-    def forward(self, x, t):
+    def forward(self, t, x):
         if not self.time_invariant:
             x = torch.cat((x, t), dim=-1)
 
@@ -28,17 +30,17 @@ class ODEFunc(nn.Module):
 
 class NeuralODE(nn.Module):
     def __init__(self, func):
+        super(NeuralODE, self).__init__()
         self.func = func
 
     def forward(self, z0, t):
         # t is a 1d array with the timesteps
 
+        print(z0.shape)
+        print(t.shape)
+
         # TODO: pass in t to ODE solver row by row then concatenate
         # output hidden states and pad
-        pred_z = []
-        for i in range(len(t)):
-            t_i = t[i, :, :]
-            pred_z.append(odeint(self.func, z0, t))
-
         pred_z = odeint(self.func, z0, t).permute(1, 0, 2)
+
         return pred_z
