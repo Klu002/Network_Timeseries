@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import numpy as np
 import torch
-import argparse
 
 class LoadInput:
     def __init__(self, data_path):
@@ -24,10 +23,11 @@ class LoadInput:
             val_data.append(data[int(len(data) * train_size):int(len(data) * (train_size + val_size))])
             test_data.append(data[int(len(data) * (train_size + val_size)):])
         return train_data, val_data, test_data
-    
-    def load_data(self, train_data, val_data, test_data):
+
+    def load_zero_interpolation(self, train_data, val_data, test_data):
         """
-        Load the data into the model reshapes it into [page_views, batch_size, features]
+        Load the data into the model reshapes it into [page_views, batch_size, features] and
+        replaces nan values with 0
         """
         train_data = np.reshape(train_data, (len(train_data), len(train_data[0]), 1))
         train_data = torch.tensor(train_data)
@@ -38,9 +38,43 @@ class LoadInput:
         test_data = np.reshape(test_data, (len(test_data), len(test_data[0]), 1))
         test_data = torch.tensor(test_data)
         test_data = test_data.permute(1, 0, 2)
+        torch.nan_to_num(train_data)
+        torch.nan_to_num(val_data)
+        torch.nan_to_num(test_data)
 
         return train_data, val_data, test_data
-    
+
+    def load_average_interpolation(self, train_data, val_data, test_data):
+        """
+        Load the data into the model reshapes it into [page_views, batch_size, features] and\
+        replaces nan values with the average value
+        """
+        train_data = np.array(train_data)
+        train_data_mean = np.nanmean(train_data, axis=1)
+        train_idx = np.where(np.isnan(train_data))
+        train_data[train_idx] = np.take(train_data_mean, train_idx[1])
+        train_data = np.reshape(train_data, (len(train_data), len(train_data[0]), 1))
+        train_data = torch.tensor(train_data)
+        train_data = train_data.permute(1, 0, 2)
+
+        val_data = np.array(val_data)
+        val_data_mean = np.nanmean(val_data, axis=1)
+        val_idx = np.where(np.isnan(val_data))
+        val_data[val_idx] = np.take(val_data_mean, val_idx[1])
+        val_data = np.reshape(val_data, (len(val_data), len(val_data[0]), 1))
+        val_data = torch.tensor(val_data)
+        val_data = val_data.permute(1, 0, 2)
+
+        test_data = np.array(test_data)
+        test_data_mean = np.nanmean(test_data, axis=1)
+        test_idx = np.where(np.isnan(test_data))
+        test_data[test_idx] = np.take(test_data_mean, test_idx[1])
+        test_data = np.reshape(test_data, (len(test_data), len(test_data[0]), 1))
+        test_data = torch.tensor(test_data)
+        test_data = test_data.permute(1, 0, 2)
+        
+        return train_data, val_data, test_data
+        
     def load_labels(self, train_data, val_data, test_data):
         """
         Labels are whether page views are increasing or decreasing of size [batch_size, timesteps]
@@ -79,14 +113,6 @@ class LoadInput:
 
         return train_time, val_time, test_time
 
-    def zero_interpolation(self, train_data, val_data, test_data):
-        torch.nan_to_num(train_data)
-        torch.nan_to_num(val_data)
-        torch.nan_to_num(test_data)
-
-    def average_interpolation(self, train_data, val_data, test_data):
-        pass
-
 def read_data(filename):
     """
     Read data from csv file
@@ -117,6 +143,3 @@ def gen_batch(x, t, start_row, end_row, n_sample=100):
         tM_idx = time_len
     
     return x[t0_idx:tM_idx, start_row:end_row], t[t0_idx:tM_idx, start_row: end_row] 
-
-if __name__ == '__main__':
-    train_data, val_data, test_data, train_time, val_time, test_time = run()
