@@ -6,8 +6,12 @@ from torch import Tensor
 from torch import nn
 from torch.autograd import Variable
 
-from .ode_funcs import NeuralODE, ODEFunc
+# from models.ode_funcs import NeuralODE, ODEFunc
+from models.ode_funcs import ODEFunc, NeuralODE
+from models.spirals import NNODEF
 from helpers.utils import reparameterize
+
+np.set_printoptions(threshold=500)
 
 class RNNEncoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim):
@@ -41,7 +45,8 @@ class NeuralODEDecoder(nn.Module):
         self.output_dim = output_dim 
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
-
+        
+        # func = NNODEF(latent_dim, hidden_dim, time_invariant=True)
         func = ODEFunc(latent_dim, hidden_dim, time_invariant=True)
         self.ode = NeuralODE(func)
         self.l2h = nn.Linear(latent_dim, hidden_dim)
@@ -52,9 +57,9 @@ class NeuralODEDecoder(nn.Module):
             z0: 
             t: number of timesteps
         """
-        t = torch.squeeze(t)
+        t_1d = t[:, 0, 0]
 
-        zs = self.ode(z0, t)
+        zs = self.ode(z0, t_1d)
         hs = self.l2h(zs)
         xs = self.h2o(hs)
 
@@ -77,31 +82,63 @@ class ODEVAE(nn.Module):
         else:
             z = reparameterize(mu, logvar)
 
+        # x_p = self.neural_decoder(z, t).permute(1, 0, 2)
         x_p = self.neural_decoder(z, t)
         return x_p, z, mu, logvar
 
-def loss_function(x_p, x, z, mu, logvar):
+def vae_loss_function(x_p, x, z, mu, logvar):
     reconstruction_loss = 0.5 * ((x - x_p)**2).sum(-1).sum(0)
-    kl_loss = -0.5 * torch.sum(1 + logvar - mu**2 - torch.exp(logvar))
+    kl_loss = -0.5 * torch.sum(1 + logvar - mu**2 - torch.exp(logvar), -1)
     
     loss = reconstruction_loss + kl_loss
     loss = torch.mean(loss)
 
     return loss
 
-def smape(y_true, y_pred, mask):
+def differentiable_smape(y_true, y_pred, mask, epsilon=0.1):
+    constant_and_epsilon = torch.tensor(0.5 + epsilon).repeat(y_true.shape)
+    summ = torch.maximum(torch.abs(y_true) + torch.abs(y_pred) + epsilon, constant_and_epsilon)
+    smape = torch.abs(y_pred - y_true) / summ
+
     nvalid = torch.sum(mask)
-    true = torch.round(torch.expm1(y_true))
-    pred = torch.maximum(torch.round(torch.expm1(y_pred)), 0)
-    sum = torch.abs(true) + torch.abs(pred)
-    raw = torch.abs(true - pred) / sum * 2
-    smape = torch.where(sum < 0.01, torch.zeros_like(sum, dtype=float), raw)
+    smape_sum = torch.sum(smape * mask) / nvalid
+    return smape_sum
 
-    return torch.sum(smape * mask) / nvalid
+def rounded_smape(y_true, y_pred, mask):
+    y_true_copy = torch.round(y_true).type(torch.IntTensor)
+    y_pred_copy = torch.round(y_pred).type(torch.IntTensor)
+    summ = torch.abs(y_true) + torch.abs(y_pred)
+    smape = torch.where(summ == 0, torch.zeros_like(summ), torch.abs(y_pred_copy - y_true_copy) / summ)
+    
+    nvalid = torch.sum(mask)
+    smape_sum = torch.sum(smape * mask) / nvalid
+    return smape_sum
 
-def smape_loss(y_true, y_pred):
+def kaggle_smape(y_true, y_pred, mask):
+    summ = torch.abs(y_true) + torch.abs(y_true)
+    smape = torch.where(summ == 0, torch.zeros_like(summ), torch.abs(y_pred - y_true) / summ)
+
+    nvalid = torch.sum(mask)
+    smape_sum = torch.sum(smape * mask) / nvalid
+    return smape_sum
+
+def mae(y_true, y_pred, mask):
+    y_true_log = torch.log1p(y_true)
+    y_pred_log = torch.log1p(y_pred)
+    error = torch.abs(y_true_log - y_pred_log)/2
+
+    nvalid = torch.sum(mask)
+    error_sum = torch.sum(error * mask) / nvalid
+    return error_sum
+
+def train_smape_loss(y_true, y_pred):
     mask = torch.isfinite(y_true)
-    y_true = torch.where(mask, y_true, torch.zeros_like(y_true))
     weight_mask = mask.type(torch.FloatTensor)
     
-    return smape(y_true, y_pred, weight_mask)
+    return differentiable_smape(y_true, y_pred, weight_mask)
+
+def test_smape_loss(y_true, y_pred):
+    mask = torch.isfinite(y_true)
+    weight_mask = mask.type(torch.FloatTensor)
+    
+    return kaggle_smape(y_true, y_pred, weight_mask)

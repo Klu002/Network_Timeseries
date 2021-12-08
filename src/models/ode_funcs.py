@@ -36,11 +36,8 @@ class NeuralODE(nn.Module):
     def forward(self, z0, t):
         # t is a 1d array with the timesteps
 
-        print(z0.shape)
-        print(t.shape)
-
         # TODO: pass in t to ODE solver row by row then concatenate
         # output hidden states and pad
-        pred_z = odeint(self.func, z0, t).permute(1, 0, 2)
+        pred_z = odeint(self.func, z0, t)
 
         return pred_z

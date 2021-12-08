@@ -1,46 +1,78 @@
 import math
+
+from numpy.core.numeric import NaN
 import torch
 import torchcde
 import numpy as np
 
 import os
 import argparse
-from models.vae import ODEVAE, loss_function
+import time
+from models.vae import ODEVAE, train_smape_loss, test_smape_loss, vae_loss_function
 from data.preprocess import LoadInput, read_data, gen_batch
+from models.spirals import generate_spirals
+
+np.set_printoptions(threshold=500)
 
 # TODO: Use cuda device instead of doing everything on CPU
-def train(device, model, optimizer, loss_func, train_data, train_time, learning_rate, batch_size, epochs, n_sample, ckpt_path=None, use_cuda=False):  
-  losses = []
-
+def train(device, model, optimizer, train_loss_func, test_loss_func, train_data, train_time, learning_rate, batch_size, epochs, n_sample, ckpt_path=None, use_cuda=False):  
   for epoch_idx in range(epochs):
-      for i in range(train_data.shape[1]):
-        try:
-          batch_x, batch_t = gen_batch(train_data, train_time, i, i + batch_size, n_sample)
+    losses = []
+    num_batches = math.ceil(train_data.shape[1]/batch_size)
+    print("Num batches: {}\n".format(num_batches))
 
-          optimizer.zero_grad()
-          # if use_cuda:
-          #     batch_x, batch_t = batch_x.cuda(), batch_t.cuda()
+    batch_order_permutation = np.random.permutation(train_data.shape[1])
+    np.random.shuffle(batch_order_permutation)
 
-          x_p, z, z_mean, z_log_var = model(batch_x, batch_t)
-          loss = loss_func(x_p, batch_x, z, z_mean, z_log_var)
-          loss = torch.mean(loss)
-          loss.backward()
-          optimizer.step()
-          losses.append(loss.item())
+    for i in range(num_batches):
+      try:
+        start_time = time.time()
+        optimizer.zero_grad()
 
-          print(f"Epoch {epoch_idx}")
-          print(np.mean(losses), np.median(losses))
+        if i == num_batches - 1:
+          batch_indices = batch_order_permutation[i*batch_size:]
+        else:
+          batch_indices = batch_order_permutation[i*batch_size:(i+1)*batch_size]
+        batch_x, batch_t = gen_batch(train_data, train_time, batch_indices, n_sample)
+        # print("Batch shape: ", batch_x.shape, batch_t.shape)
 
-          if epoch_idx % 10 == 0 and ckpt_path:
-            torch.save({
-              'model_state_dict': model.state_dict(),
-            }, ckpt_path + '_' + epoch_idx + '.pth')
-            print('Saved model at {}'.format(ckpt_path + '_' + epoch_idx + '.pth'))
+        max_len = np.random.randint(batch_t.shape[1]//2, batch_t.shape[1])
+        permutation = np.random.permutation(batch_t.shape[0])
+        np.random.shuffle(permutation)
+        permutation = np.sort(permutation[:max_len])
 
-        except KeyboardInterrupt:
-          return epoch_idx - 1
+        batch_x, batch_t = batch_x[permutation], batch_t[permutation]
+        batch_x, batch_t = batch_x.to(device), batch_t.to(device)
 
+        x_p, z, z_mean, z_log_var = model(batch_x, batch_t)
+        # If loss function = SMAPE, don't have to divide by max_len. 
+        # If loss function = VAE_loss, must divide by max len.
+        differentiable_smape_loss = train_loss_func(batch_x, x_p)
+        kaggle_smape_loss = test_loss_func(batch_x, x_p)
+        # loss = loss_func(x_p, batch_x, z, z_mean, z_log_var)
+        # loss /= max_len
+        differentiable_smape_loss.backward()
+        optimizer.step()
+        losses.append(differentiable_smape_loss.item())
 
+        end_time = time.time()
+        time_taken = end_time - start_time
+
+        print("Batch {}/{}".format(i + 1, num_batches))
+        print("{}s - differentiable_smape: {} - kaggle_smape: {}".format(round(time_taken, 3), round(differentiable_smape_loss.item(), 3), round(kaggle_smape_loss.item(), 3)))
+
+        if epoch_idx > 0 and epoch_idx % 10 == 0 and ckpt_path:
+          torch.save({
+            'model_state_dict': model.state_dict(),
+          }, ckpt_path + '_' + str(epoch_idx) + '.pth')
+          print('Saved model at {}'.format(ckpt_path + '_' + str(epoch_idx) + '.pth'))
+
+      except KeyboardInterrupt:
+        return epoch_idx - 1
+
+    print("Epoch {}/{}".format(epoch_idx, epochs))
+    print("mean differentiable_smape: {} - median differentiable_smape: {}\n".format(np.mean(losses), np.median(losses)))
+    
 # class RunningAverageMeter(object):
 #   """Computes and stores the average and current value"""
 
@@ -77,9 +109,10 @@ def main():
   parser.add_argument('--input', type=str, default=None, help='Path to csv file containing data')
   parser.add_argument('--load_dir', type=str, default='../data/processed', help='Path for loading data')
   parser.add_argument('--model_save_dir', type=str, default=None, help='Path for save checkpoints')
-  parser.add_argument('--training_save_dir', type=str, default='../saved/training_weights', help='Path for saving model weights while training')
+  parser.add_argument('--training_save_dir', type=str, default=None, help='Path for saving model weights while training')
   parser.add_argument('--model_name', type=str, default='ODE', help='Name of model for save checkpoints')
-
+  
+  parser.add_argument('--use_cuda', type=eval, default=False)
   parser.add_argument('--visualize', type=eval, default=False)
   args = parser.parse_args()
 
@@ -97,11 +130,9 @@ def main():
     data_path = args.load_dir
     ld = LoadInput(data_path)
     train_data, val_data, test_data = ld.split_train_val_test()
-    train_data, val_data, test_data = ld.load_data(train_data, val_data, test_data)
-    train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
 
-    # Interpolation method to replace NaN values with numerical values
-    ld.zero_interpolation(train_data, val_data, test_data)
+    train_data, val_data, test_data = ld.load_average_interpolation(train_data, val_data, test_data)
+    train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
 
   output_dim = 1
   hidden_dim = 64
@@ -110,7 +141,11 @@ def main():
   lr = args.lr
   batch_size = args.batch_size
   n_sample = args.n_sample
-  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+  device = 'cpu'
+  if args.use_cuda:
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+  
+  print("Using device: ", device)
 
   train_data = train_data.to(device)
   val_data = val_data.to(device)
@@ -121,20 +156,22 @@ def main():
 
   model = ODEVAE(output_dim, hidden_dim, latent_dim).to(device)
   optim = torch.optim.Adam(model.parameters(), betas=(0.9, 0.999), lr=lr)
-  loss_func = loss_function
+  train_loss_func = train_smape_loss
+  test_loss_func = test_smape_loss
+  # loss_func = vae_loss_function
   # loss_meter = RunningAverageMeter()
 
-  if args.save_dir:
+  if args.model_save_dir:
     if not args.model_name:
       print('Please specify a model name to load')
     else:
-      if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
-      ckpt_path = os.path.join(args.save_dir, args.model_name + '.pth')
+      if not os.path.exists(args.model_save_dir):
+        os.makedirs(args.model_save_dir)
+      ckpt_path = os.path.join(args.model_save_dir, args.model_name + '.pth')
 
       if os.path.exists(ckpt_path):
         checkpoint = torch.load(ckpt_path)
-        model.load_stat_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint['model_state_dict'])
         optim.load_state_dict(checkpoint['optimizer_state_dict'])
 
         train_data = checkpoint['train_data']
@@ -150,31 +187,41 @@ def main():
 
         print('Loaded checkpoint from {}'.format(ckpt_path))
 
-  if args.save_dir and args.model_name:
-    ckpt_path = os.path.join(args.train_dir, args.model_name)
-    trained_epochs = train(device, model, optim, loss_func, train_data, train_time, lr, batch_size, epochs, n_sample, ckpt_path)
+  # orig_trajs, samp_trajs, samp_ts = generate_spirals()
+
+  done_training = True
+  if args.training_save_dir and args.model_name:
+    ckpt_path = os.path.join(args.training_save_dir, args.model_name)
+    trained_epochs = train(device, model, optim, train_loss_func, test_loss_func, train_data, train_time, lr, batch_size, epochs, n_sample, ckpt_path)
 
     print('Trained for {} epochs'.format(trained_epochs))
+    if trained_epochs > 0 and trained_epochs < epochs:
+      torch.save({
+        'model_state_dict': model.state_dict(),
+      }, ckpt_path + '_' + str(trained_epochs) + '.pth')
+      
     if trained_epochs < epochs:
-      torch.save({
-        'model_state_dict': model.state_dict(),
-      }, ckpt_path + '_' + trained_epochs + '.pth')
-    else:
-      ckpt_path = os.path.join(args.train_dir, args.model_name + '.pth')
-      torch.save({
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optim.state_dict(),
-        'train_data': train_data,
-        'val_data': val_data,
-        'test_data': test_data,
-        'train_time': train_time,
-        'val_time': val_time,
-        'test_time': test_time, 
-        'args': args
-      }, ckpt_path)
-      print('Saved model at {}'.format(ckpt_path))
+      done_training = False
   else:
-    train(device, model, optim, loss_func, train_data, train_time, lr, batch_size, epochs, n_sample)
+    trained_epochs = train(device, model, optim, train_loss_func, test_loss_func, train_data, train_time, lr, batch_size, epochs, n_sample)
+    if trained_epochs < epochs:
+      done_training = False
+
+  if done_training:
+    final_model_path = os.path.join(args.model_save_dir, args.model_name + '.pth')
+    torch.save({
+      'model_state_dict': model.state_dict(),
+      'optimizer_state_dict': optim.state_dict(),
+      'train_data': train_data,
+      'val_data': val_data,
+      'test_data': test_data,
+      'train_time': train_time,
+      'val_time': val_time,
+      'test_time': test_time, 
+      'args': args
+    }, final_model_path)
+    print('Saved model at {}'.format(final_model_path))
+
 
   # TODO: if args.visualize, plot figures here
 
