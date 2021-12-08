@@ -54,8 +54,9 @@ class GRUD_cell(torch.nn.Module):
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.num_layers = num_layers
-        self.return_hidden = return_hidden #controls the output, True if another GRU-D layer follows
 
+        #controls the output, True if another GRU-D layer follows
+        self.return_hidden = return_hidden 
 
         x_mean = torch.tensor(x_mean, requires_grad = True)
         self.register_buffer('x_mean', x_mean)
@@ -64,6 +65,8 @@ class GRUD_cell(torch.nn.Module):
         self.dropout_type = dropout_type
         self.dropout = dropout
         self.bidirectional = bidirectional
+        
+        #TODO: Implement bidrectional support
         num_directions = 2 if bidirectional else 1
         
         if not isinstance(dropout, numbers.Number) or not 0 <= dropout <= 1 or \
@@ -97,16 +100,9 @@ class GRUD_cell(torch.nn.Module):
         Hidden_State = torch.zeros(self.hidden_size, requires_grad = True)
         #we use buffers because pytorch will take care of pushing them to GPU for us
         self.register_buffer('Hidden_State', Hidden_State)
-        self.register_buffer('X_last_obs', torch.zeros(input_size)) #torch.tensor(x_mean) #TODO: what to initialize last observed values with?, also check broadcasting behaviour
-
-    
-    #TODO: check usefulness of everything below here, just copied skeleton
-
+        self.register_buffer('X_last_obs', torch.zeros(input_size)) 
 
         self.reset_parameters()
-        
-    
-
 
     def reset_parameters(self):
         stdv = 1.0 / math.sqrt(self.hidden_size)
@@ -160,32 +156,20 @@ class GRUD_cell(torch.nn.Module):
             s += ', bidirectional={bidirectional}'
         return s.format(**self.__dict__)
     
-    
-
-
-
     @property
     def _flat_weights(self):
         return list(self._parameters.values())
 
 
     def forward(self, input):
-        # input.size = (3, 33,49) : num_input or num_hidden, num_layer or step
-        #X = torch.squeeze(input[0]) # .size = (33,49)
-        #Mask = torch.squeeze(input[1]) # .size = (33,49)
-        #Delta = torch.squeeze(input[2]) # .size = (33,49)
         X = input[:,0,:,:]
         Mask = input[:,1,:,:]
         Delta = input[:,2,:,:]
         
-
-        step_size = X.size(1) # 49
-        #print('step size : ', step_size)
-        
         output = None
-        #h = Hidden_State
         h = getattr(self, 'Hidden_State')
-        #felix - buffer system from newer pytorch version
+
+        #buffer system from newer pytorch version
         x_mean = getattr(self, 'x_mean')
         x_last_obsv = getattr(self, 'X_last_obs')
         
@@ -197,32 +181,17 @@ class GRUD_cell(torch.nn.Module):
         #iterate over seq
         for timestep in range(X.size()[2]):
             
-            #x = torch.squeeze(X[:,layer:layer+1])
-            #m = torch.squeeze(Mask[:,layer:layer+1])
-            #d = torch.squeeze(Delta[:,layer:layer+1])
             x = torch.squeeze(X[:,:,timestep])
             m = torch.squeeze(Mask[:,:,timestep])
             d = torch.squeeze(Delta[:,:,timestep])
             
-
-            #(4)
             gamma_x = torch.exp(-1* torch.nn.functional.relu( self.w_dg_x(d) ))
             gamma_h = torch.exp(-1* torch.nn.functional.relu( self.w_dg_h(d) ))
 
-
-            #(5)
-            #standard mult handles case correctly, this should work - maybe broadcast x_mean, seems to be taking care of that anyway
-            
-            #update x_last_obsv
-            #print(x.size())
-            #print(x_last_obsv.size())
             x_last_obsv = torch.where(m>0,x,x_last_obsv)
-            #print('after update')
-            #print(x_last_obsv)
             x = m * x + (1 - m) * (gamma_x * x + (1 - gamma_x) * x_mean)
             x = m * x + (1 - m) * (gamma_x * x_last_obsv + (1 - gamma_x) * x_mean)
 
-            #(6)
             if self.dropout == 0:
 
                 h = gamma_h*h
@@ -234,7 +203,6 @@ class GRUD_cell(torch.nn.Module):
 
                 h = (1 - z) * h + z * h_tilde
 
-            #TODO: not adapted yet
             elif self.dropout_type == 'Moon':
                 '''
                 RNNDROP: a novel dropout for rnn in asr(2015)
@@ -297,7 +265,5 @@ class GRUD_cell(torch.nn.Module):
             hidden_tensor[:,timestep,:] = h
         
         output = output_tensor, hidden_tensor
-        
-        #else:
-        #    output = output_tensor
+
         return output
