@@ -7,7 +7,6 @@ import warnings
 import itertools
 import numbers
 import torch.utils.data as utils
-from GRUD_layer import GRUD_cell
 
 class grud_model(torch.nn.Module):
     def __init__(self,input_size, hidden_size, output_size, num_layers = 1, x_mean = 0,\
@@ -22,28 +21,18 @@ class grud_model(torch.nn.Module):
 
         if self.num_layers >1:
             #(batch, seq, feature)
-            self.gru_layers = torch.nn.GRU(input_size = hidden_size, hidden_size = hidden_size, batch_first = True, num_layers = self.num_layers -1, dropout=dropout)
-
-    def initialize_hidden(self, batch_size):
-        device = next(self.parameters()).device
-        # The hidden state at the start are all zeros
-        return torch.zeros(self.num_layers-1, batch_size, self.hidden_size, device=device)
+            self.gru_layers = torch.nn.GRU(
+                input_size = hidden_size, hidden_size = hidden_size,batch_first = True,
+                num_layers = self.num_layers -1, dropout=dropout)
 
     def forward(self,input):
         output, hidden = self.gru_d(input)
         # batch_size, n_hidden, n_timesteps
 
         if self.num_layers >1:
-            #TODO remove init hidden, not necessary, auto init works fine
-            init_hidden = self.initialize_hidden(hidden.size()[0])
-            
-
-            output, hidden = self.gru_layers(hidden)#, init_hidden)
-  
+            output, hidden = self.gru_layers(hidden)
 
             output = self.hidden_to_output(output)
             output = torch.sigmoid(output)
 
-        #print("final output size passed as model result")
-        #print(output.size())
         return output
