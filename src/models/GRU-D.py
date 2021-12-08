@@ -1,12 +1,9 @@
 import torch
 import numpy as np
 import pandas as pd
-import os
 import math
 import warnings
-import itertools
 import numbers
-import torch.utils.data as utils
 
 class grud_model(torch.nn.Module):
     def __init__(self,input_size, hidden_size, output_size, num_layers = 1, x_mean = 0,\
@@ -35,7 +32,8 @@ class grud_model(torch.nn.Module):
             output = self.hidden_to_output(output)
             output = torch.sigmoid(output)
 
-        return output
+        return output, hidden
+
 
 class GRUD_cell(torch.nn.Module):
     """
@@ -43,7 +41,7 @@ class GRUD_cell(torch.nn.Module):
     Inputs: x_mean
             n_smp x 3 x n_channels x len_seq tensor (0: data, 1: mask, 2: deltat)
     """
-    def __init__(self, input_size, hidden_size, output_size, num_layers=1, x_mean=0,\
+    def __init__(self, input_size, hidden_size, output_size=None, num_layers=1, x_mean=0,\
                  bias=True, batch_first=False, bidirectional=False, dropout_type='mloss', dropout=0, return_hidden = False):
 
         use_cuda = torch.cuda.is_available()
@@ -52,7 +50,10 @@ class GRUD_cell(torch.nn.Module):
         super(GRUD_cell, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.output_size = output_size
+        if output_size:
+            self.output_size = output_size
+        else:
+            self.output_size = hidden_size
         self.num_layers = num_layers
 
         #controls the output, True if another GRU-D layer follows
@@ -65,9 +66,6 @@ class GRUD_cell(torch.nn.Module):
         self.dropout_type = dropout_type
         self.dropout = dropout
         self.bidirectional = bidirectional
-        
-        #TODO: Implement bidrectional support
-        num_directions = 2 if bidirectional else 1
         
         if not isinstance(dropout, numbers.Number) or not 0 <= dropout <= 1 or \
                 isinstance(dropout, bool):
@@ -108,53 +106,6 @@ class GRUD_cell(torch.nn.Module):
         stdv = 1.0 / math.sqrt(self.hidden_size)
         for weight in self.parameters():
             torch.nn.init.uniform_(weight, -stdv, stdv)
-
-    def check_forward_args(self, input, hidden, batch_sizes):
-        is_input_packed = batch_sizes is not None
-        expected_input_dim = 2 if is_input_packed else 3
-        if input.dim() != expected_input_dim:
-            raise RuntimeError(
-                'input must have {} dimensions, got {}'.format(
-                    expected_input_dim, input.dim()))
-        if self.input_size != input.size(-1):
-            raise RuntimeError(
-                'input.size(-1) must be equal to input_size. Expected {}, got {}'.format(
-                    self.input_size, input.size(-1)))
-
-        if is_input_packed:
-            mini_batch = int(batch_sizes[0])
-        else:
-            mini_batch = input.size(0) if self.batch_first else input.size(1)
-
-        num_directions = 2 if self.bidirectional else 1
-        expected_hidden_size = (self.num_layers * num_directions,
-                                mini_batch, self.hidden_size)
-        
-        def check_hidden_size(hx, expected_hidden_size, msg='Expected hidden size {}, got {}'):
-            if tuple(hx.size()) != expected_hidden_size:
-                raise RuntimeError(msg.format(expected_hidden_size, tuple(hx.size())))
-
-        if self.mode == 'LSTM':
-            check_hidden_size(hidden[0], expected_hidden_size,
-                              'Expected hidden[0] size {}, got {}')
-            check_hidden_size(hidden[1], expected_hidden_size,
-                              'Expected hidden[1] size {}, got {}')
-        else:
-            check_hidden_size(hidden, expected_hidden_size)
-    
-    def extra_repr(self):
-        s = '{input_size}, {hidden_size}'
-        if self.num_layers != 1:
-            s += ', num_layers={num_layers}'
-        if self.bias is not True:
-            s += ', bias={bias}'
-        if self.batch_first is not False:
-            s += ', batch_first={batch_first}'
-        if self.dropout != 0:
-            s += ', dropout={dropout}'
-        if self.bidirectional is not False:
-            s += ', bidirectional={bidirectional}'
-        return s.format(**self.__dict__)
     
     @property
     def _flat_weights(self):
@@ -189,7 +140,6 @@ class GRUD_cell(torch.nn.Module):
             gamma_h = torch.exp(-1* torch.nn.functional.relu( self.w_dg_h(d) ))
 
             x_last_obsv = torch.where(m>0,x,x_last_obsv)
-            x = m * x + (1 - m) * (gamma_x * x + (1 - gamma_x) * x_mean)
             x = m * x + (1 - m) * (gamma_x * x_last_obsv + (1 - gamma_x) * x_mean)
 
             if self.dropout == 0:
