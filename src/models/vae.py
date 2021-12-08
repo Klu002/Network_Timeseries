@@ -95,8 +95,8 @@ def vae_loss_function(x_p, x, z, mu, logvar):
 
     return loss
 
-def differentiable_smape(y_true, y_pred, mask, epsilon=0.1):
-    constant_and_epsilon = torch.tensor(0.5 + epsilon).repeat(y_true.shape)
+def differentiable_smape(device, y_true, y_pred, mask, epsilon=0.1):
+    constant_and_epsilon = torch.tensor(0.5 + epsilon).repeat(y_true.shape).to(device)
     summ = torch.maximum(torch.abs(y_true) + torch.abs(y_pred) + epsilon, constant_and_epsilon)
     smape = torch.abs(y_pred - y_true) / summ
 
@@ -104,7 +104,7 @@ def differentiable_smape(y_true, y_pred, mask, epsilon=0.1):
     smape_sum = torch.sum(smape * mask) / nvalid
     return smape_sum
 
-def rounded_smape(y_true, y_pred, mask):
+def rounded_smape(device, y_true, y_pred, mask):
     y_true_copy = torch.round(y_true).type(torch.IntTensor)
     y_pred_copy = torch.round(y_pred).type(torch.IntTensor)
     summ = torch.abs(y_true) + torch.abs(y_pred)
@@ -114,15 +114,16 @@ def rounded_smape(y_true, y_pred, mask):
     smape_sum = torch.sum(smape * mask) / nvalid
     return smape_sum
 
-def kaggle_smape(y_true, y_pred, mask):
-    summ = torch.abs(y_true) + torch.abs(y_true)
-    smape = torch.where(summ == 0, torch.zeros_like(summ), torch.abs(y_pred - y_true) / summ)
+def kaggle_smape(device, y_true, y_pred, mask):
+    summ = torch.abs(y_true) + torch.abs(y_pred)
+    smape = torch.where(summ == 0, torch.zeros_like(summ), torch.abs(y_pred - y_true) / (2 * summ))
 
     nvalid = torch.sum(mask)
-    smape_sum = torch.sum(smape * mask) / nvalid
+    smape_sum = (100 * torch.sum(smape * mask)) / nvalid
+
     return smape_sum
 
-def mae(y_true, y_pred, mask):
+def mae(device, y_true, y_pred, mask):
     y_true_log = torch.log1p(y_true)
     y_pred_log = torch.log1p(y_pred)
     error = torch.abs(y_true_log - y_pred_log)/2
@@ -131,14 +132,14 @@ def mae(y_true, y_pred, mask):
     error_sum = torch.sum(error * mask) / nvalid
     return error_sum
 
-def train_smape_loss(y_true, y_pred):
-    mask = torch.isfinite(y_true)
+def train_smape_loss(device, y_true, y_pred):
+    mask = torch.isfinite(y_true).to(device)
     weight_mask = mask.type(torch.FloatTensor)
     
-    return differentiable_smape(y_true, y_pred, weight_mask)
+    return differentiable_smape(device, y_true, y_pred, weight_mask)
 
-def test_smape_loss(y_true, y_pred):
-    mask = torch.isfinite(y_true)
+def test_smape_loss(device, y_true, y_pred):
+    mask = torch.isfinite(y_true).to(device)
     weight_mask = mask.type(torch.FloatTensor)
     
-    return kaggle_smape(y_true, y_pred, weight_mask)
+    return kaggle_smape(device, y_true, y_pred, weight_mask)

@@ -10,7 +10,6 @@ import argparse
 import time
 from models.vae import ODEVAE, train_smape_loss, test_smape_loss, vae_loss_function
 from data.preprocess import LoadInput, read_data, gen_batch
-from models.spirals import generate_spirals
 
 np.set_printoptions(threshold=500)
 
@@ -45,10 +44,15 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
         batch_x, batch_t = batch_x.to(device), batch_t.to(device)
 
         x_p, z, z_mean, z_log_var = model(batch_x, batch_t)
+        x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
+
+        with np.printoptions(threshold=50):
+          print("True x: ", batch_x)
+          print("Pred x: ", x_p)
         # If loss function = SMAPE, don't have to divide by max_len. 
         # If loss function = VAE_loss, must divide by max len.
-        differentiable_smape_loss = train_loss_func(batch_x, x_p)
-        kaggle_smape_loss = test_loss_func(batch_x, x_p)
+        differentiable_smape_loss = train_loss_func(device, batch_x, x_p)
+        kaggle_smape_loss = test_loss_func(device, batch_x, x_p)
         # loss = loss_func(x_p, batch_x, z, z_mean, z_log_var)
         # loss /= max_len
         differentiable_smape_loss.backward()
@@ -91,13 +95,35 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
 #       self.avg = self.avg * self.momentum + val * (1 - self.momentum)
 #     self.val = val
 
-# def test(model, test_data):
-#   test_X, test_Y = test_data
-#   pred = model(test_X).squeeze(-1)
-#   prediction_matches = (binary_prediction == test_y).to(test_y.dtype)
-#   proportion_correct = prediction_matches.sum() / test_y.size(0)
+# def test(device, model, optimizer, test_loss_func, test_data, test_time, batch_size, n_sample, use_cuda=False):
+#   num_batches = math.ceil(test_data.shape[1]/batch_size)
+#   print("Num batches: {}\n".format(num_batches))
 
-#   return proportion_correct
+#   losses = []
+#   for i in range(num_batches):
+#     start_time = time.time()
+#     optimizer.zero_grad()
+
+#     if i == num_batches - 1:
+#       batch_indices = np.arange(i * batch_size, test_data.shape[1])
+#     else:
+#       batch_indices = np.arange(i * batch_size, (i + 1) * batch_size)
+#     batch_x, batch_t = gen_batch(test_data, test_time, batch_indices, n_sample)
+#     batch_x, batch_t = batch_x.to(device), batch_t.to(device)
+
+#     x_p, z, _, _ = model(batch_x, batch_t)
+#     x_p, z = x_p.to(device), z.to(device)
+
+#     kaggle_smape_loss = test_loss_func(device, batch_x, x_p)
+#     losses.append(kaggle_smape_loss.item())
+
+#     end_time = time.time()
+#     time_taken = end_time - start_time
+
+#     print("Batch {}/{}".format(i + 1, num_batches))
+#     print("{}s - kaggle_smape: {}".format(round(time_taken, 3), round(kaggle_smape_loss.item(), 3)))
+
+#   print("Avg Test Loss - {}".format(np.mean(losses)))
 
 def main():
   parser = argparse.ArgumentParser(description='Latent ODE Model')
@@ -172,14 +198,14 @@ def main():
       if os.path.exists(ckpt_path):
         checkpoint = torch.load(ckpt_path)
         model.load_state_dict(checkpoint['model_state_dict'])
-        optim.load_state_dict(checkpoint['optimizer_state_dict'])
+        # optim.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        train_data = checkpoint['train_data']
-        val_data = checkpoint['val_data']
-        test_data = checkpoint['test_data']
-        train_time = checkpoint['train_time']
-        val_time = checkpoint['val_time']
-        test_time = checkpoint['test_time']
+        # train_data = checkpoint['train_data']
+        # val_data = checkpoint['val_data']
+        # test_data = checkpoint['test_data']
+        # train_time = checkpoint['train_time']
+        # val_time = checkpoint['val_time']
+        # test_time = checkpoint['test_time']
         # epochs = checkpoint['args'].epochs
         # lr = checkpoint['args'].lr
         # batch_size = checkpoint['args'].batch_size

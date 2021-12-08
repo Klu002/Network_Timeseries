@@ -35,15 +35,21 @@ class LoadInput:
         Load the data into the model reshapes it into [page_views, batch_size, features] and
         replaces nan values with 0
         """
-        train_data = np.reshape(train_data, (len(train_data), len(train_data[0]), 1))
+        train_data = np.array(train_data)
+        train_data = np.expand_dims(train_data, axis=2)
         train_data = torch.tensor(train_data)
         train_data = train_data.permute(1, 0, 2)
-        val_data = np.reshape(val_data, (len(val_data), len(val_data[0]), 1))
+
+        val_data = np.array(val_data)
+        val_data = np.expand_dims(val_data, axis=2)
         val_data = torch.tensor(val_data)
         val_data = val_data.permute(1, 0, 2)
-        test_data = np.reshape(test_data, (len(test_data), len(test_data[0]), 1))
+
+        test_data = np.array(test_data)
+        test_data = np.expand_dims(test_data, axis=2)
         test_data = torch.tensor(test_data)
         test_data = test_data.permute(1, 0, 2)
+
         torch.nan_to_num(train_data)
         torch.nan_to_num(val_data)
         torch.nan_to_num(test_data)
@@ -72,6 +78,34 @@ class LoadInput:
         test_data = np.array(test_data)
         test_data = self.remove_percent_nan_values(test_data, 0.1)
         test_data = np.where(np.isnan(test_data), np.ma.array(test_data, mask=np.isnan(test_data)).mean(axis=1)[:, np.newaxis], test_data)
+        test_data = np.expand_dims(test_data, axis=2)
+        test_data = torch.tensor(test_data)
+        test_data = test_data.permute(1, 0, 2)
+        
+        return train_data, val_data, test_data
+
+    def load_median_interpolation(self, train_data, val_data, test_data):
+        """
+        Load the data into the model reshapes it into [page_views, batch_size, features] and\
+        replaces nan values with the average value
+        """
+        train_data = np.array(train_data)
+        train_data = self.remove_percent_nan_values(train_data, 0.1)
+        train_data = np.where(np.isnan(train_data), np.ma.array(train_data, mask=np.isnan(train_data)).median(axis=1)[:, np.newaxis], train_data)
+        train_data = np.expand_dims(train_data, axis=2)
+        train_data = torch.tensor(train_data)
+        train_data = train_data.permute(1, 0, 2)
+
+        val_data = np.array(val_data)
+        val_data = self.remove_percent_nan_values(val_data, 0.1)
+        val_data = np.where(np.isnan(val_data), np.ma.array(val_data, mask=np.isnan(val_data)).median(axis=1)[:, np.newaxis], val_data)
+        val_data = np.expand_dims(val_data, axis=2)
+        val_data = torch.tensor(val_data)
+        val_data = val_data.permute(1, 0, 2)
+
+        test_data = np.array(test_data)
+        test_data = self.remove_percent_nan_values(test_data, 0.1)
+        test_data = np.where(np.isnan(test_data), np.ma.array(test_data, mask=np.isnan(test_data)).median(axis=1)[:, np.newaxis], test_data)
         test_data = np.expand_dims(test_data, axis=2)
         test_data = torch.tensor(test_data)
         test_data = test_data.permute(1, 0, 2)
@@ -147,6 +181,11 @@ def gen_batch(x, t, batch_indices, n_sample=100):
     
     num_entries = x.shape[1]
     return x[t0_idx:tM_idx][:, batch_indices], t[t0_idx:tM_idx][:, batch_indices] 
+
+def get_row(x, t, col_num, start_time, time_len):
+    # End time is exclusive
+    end_time = min(start_time + time_len, x.shape[0])
+    return x[start_time:end_time][:, col_num], t[start_time:end_time][:, col_num]
 
 # if __name__ == '__main__':
 #     train_data, val_data, test_data, train_time, val_time, test_time = run()
