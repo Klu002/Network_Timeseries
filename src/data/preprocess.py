@@ -122,7 +122,7 @@ def read_data(filename):
 
     return df, dates
 
-def gen_batch(x, t, start_row, end_row, n_sample=100):
+def gen_batch(x, t, start_row, batch_size, n_sample=100):
     """
     Generate batches of data
     Input: x: Data of size (num_timsteps, num_rows, 1)
@@ -142,4 +142,10 @@ def gen_batch(x, t, start_row, end_row, n_sample=100):
         t0_idx = 0
         tM_idx = time_len
     
-    return x[t0_idx:tM_idx, start_row:end_row], t[t0_idx:tM_idx, start_row: end_row] 
+    num_entries = x.shape[1]
+    if start_row + batch_size >= num_entries:
+        return x[t0_idx:tM_idx, start_row:], t[t0_idx:tM_idx, start_row:]
+    return x[t0_idx:tM_idx, start_row:start_row + batch_size], t[t0_idx:tM_idx, start_row: start_row + batch_size] 
+
+# if __name__ == '__main__':
+#     train_data, val_data, test_data, train_time, val_time, test_time = run()

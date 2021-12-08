@@ -6,7 +6,9 @@ from torch import Tensor
 from torch import nn
 from torch.autograd import Variable
 
-from .ode_funcs import NeuralODE, ODEFunc
+# from models.ode_funcs import NeuralODE, ODEFunc
+from models.ode_funcs import ODEFunc, NeuralODE
+from models.spirals import NNODEF
 from helpers.utils import reparameterize
 
 class RNNEncoder(nn.Module):
@@ -41,7 +43,8 @@ class NeuralODEDecoder(nn.Module):
         self.output_dim = output_dim 
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
-
+        
+        # func = NNODEF(latent_dim, hidden_dim, time_invariant=True)
         func = ODEFunc(latent_dim, hidden_dim, time_invariant=True)
         self.ode = NeuralODE(func)
         self.l2h = nn.Linear(latent_dim, hidden_dim)
@@ -52,9 +55,9 @@ class NeuralODEDecoder(nn.Module):
             z0: 
             t: number of timesteps
         """
-        t = torch.squeeze(t)
+        t_1d = t[:, 0, 0]
 
-        zs = self.ode(z0, t)
+        zs = self.ode(z0, t_1d)
         hs = self.l2h(zs)
         xs = self.h2o(hs)
 
@@ -77,12 +80,13 @@ class ODEVAE(nn.Module):
         else:
             z = reparameterize(mu, logvar)
 
+        # x_p = self.neural_decoder(z, t).permute(1, 0, 2)
         x_p = self.neural_decoder(z, t)
         return x_p, z, mu, logvar
 
-def loss_function(x_p, x, z, mu, logvar):
+def vae_loss_function(x_p, x, z, mu, logvar):
     reconstruction_loss = 0.5 * ((x - x_p)**2).sum(-1).sum(0)
-    kl_loss = -0.5 * torch.sum(1 + logvar - mu**2 - torch.exp(logvar))
+    kl_loss = -0.5 * torch.sum(1 + logvar - mu**2 - torch.exp(logvar), -1)
     
     loss = reconstruction_loss + kl_loss
     loss = torch.mean(loss)
@@ -92,12 +96,13 @@ def loss_function(x_p, x, z, mu, logvar):
 def smape(y_true, y_pred, mask):
     nvalid = torch.sum(mask)
     true = torch.round(torch.expm1(y_true))
-    pred = torch.maximum(torch.round(torch.expm1(y_pred)), 0)
+    pred = torch.maximum(torch.round(torch.expm1(y_pred)), torch.tensor(0))
     sum = torch.abs(true) + torch.abs(pred)
     raw = torch.abs(true - pred) / sum * 2
+
     smape = torch.where(sum < 0.01, torch.zeros_like(sum, dtype=float), raw)
 
-    return torch.sum(smape * mask) / nvalid
+    return (smape * mask).sum(-1).sum(0) / nvalid
 
 def smape_loss(y_true, y_pred):
     mask = torch.isfinite(y_true)
