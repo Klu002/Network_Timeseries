@@ -297,6 +297,7 @@ class GRUD_cell(torch.nn.Module):
             hidden_tensor[:,timestep,:] = h
         
         output = output_tensor, hidden_tensor
+        
         #else:
         #    output = output_tensor
         return output

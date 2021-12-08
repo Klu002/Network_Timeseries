@@ -6,7 +6,7 @@ import numpy as np
 import os
 import argparse
 from models.vae import ODEVAE, loss_function
-from preprocess import LoadInput, read_data, gen_batch
+from data.preprocess import LoadInput, read_data, gen_batch
 
 # TODO: Use cuda device instead of doing everything on CPU
 def train(device, model, optimizer, loss_func, train_data, train_time, learning_rate, batch_size, epochs, n_sample, ckpt_path=None, use_cuda=False):  

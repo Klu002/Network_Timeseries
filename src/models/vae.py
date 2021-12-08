@@ -7,7 +7,7 @@ from torch import nn
 from torch.autograd import Variable
 
 from .ode_funcs import NeuralODE, ODEFunc
-from .utils import reparameterize
+from helpers.utils import reparameterize
 
 class RNNEncoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim):
@@ -88,3 +88,20 @@ def loss_function(x_p, x, z, mu, logvar):
     loss = torch.mean(loss)
 
     return loss
+
+def smape(y_true, y_pred, mask):
+    nvalid = torch.sum(mask)
+    true = torch.round(torch.expm1(y_true))
+    pred = torch.maximum(torch.round(torch.expm1(y_pred)), 0)
+    sum = torch.abs(true) + torch.abs(pred)
+    raw = torch.abs(true - pred) / sum * 2
+    smape = torch.where(sum < 0.01, torch.zeros_like(sum, dtype=float), raw)
+
+    return torch.sum(smape * mask) / nvalid
+
+def smape_loss(y_true, y_pred):
+    mask = torch.isfinite(y_true)
+    y_true = torch.where(mask, y_true, torch.zeros_like(y_true))
+    weight_mask = mask.type(torch.FloatTensor)
+    
+    return smape(y_true, y_pred, weight_mask)
