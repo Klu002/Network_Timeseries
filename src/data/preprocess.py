@@ -50,9 +50,9 @@ class LoadInput:
         test_data = torch.tensor(test_data)
         test_data = test_data.permute(1, 0, 2)
 
-        torch.nan_to_num(train_data)
-        torch.nan_to_num(val_data)
-        torch.nan_to_num(test_data)
+        train_data = torch.nan_to_num(train_data)
+        val_data = torch.nan_to_num(val_data)
+        test_data = torch.nan_to_num(test_data)
 
         return train_data, val_data, test_data
 
