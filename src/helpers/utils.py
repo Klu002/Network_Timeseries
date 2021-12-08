@@ -19,4 +19,3 @@ def reparameterize(mu, logvar):
 #     # Load checkpoint
 #     checkpt = torch.load(ckpt_path)
 #     ckpt_args = checkpt[]
-    
