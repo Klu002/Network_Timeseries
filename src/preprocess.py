@@ -30,14 +30,15 @@ class LoadInput:
         Load the data into the model reshapes it into [page_views, batch_size, features]
         """
         train_data = np.reshape(train_data, (len(train_data), len(train_data[0]), 1))
-        train_data = torch.tensor(train_data, dtype=np.float32)
+        train_data = torch.tensor(train_data)
         train_data = train_data.permute(1, 0, 2)
         val_data = np.reshape(val_data, (len(val_data), len(val_data[0]), 1))
-        val_data = torch.tensor(val_data, dtype=np.float32)
+        val_data = torch.tensor(val_data)
         val_data = val_data.permute(1, 0, 2)
         test_data = np.reshape(test_data, (len(test_data), len(test_data[0]), 1))
-        test_data = torch.tensor(test_data, dtype=np.float32)
+        test_data = torch.tensor(test_data)
         test_data = test_data.permute(1, 0, 2)
+
         return train_data, val_data, test_data
     
     def load_labels(self, train_data, val_data, test_data):
@@ -59,24 +60,32 @@ class LoadInput:
         """
         Load the time data in the shape of [timesteps, batch_size, features]
         """
-        train_time = []
-        val_time = []
-        test_time = []
+        train_time = torch.empty(train_data.shape)
+        val_time = torch.empty(val_data.shape)
+        test_time = torch.empty(test_data.shape)
 
-        for i in range(len(train_data)):
-            train_time.append(np.array(i for i in range(len(train_data[i]))))
+        train_data_len = len(train_data)
+        val_data_len = len(val_data)
+        test_data_len = len(test_data)
 
-        for i in range(len(val_data)):
-            val_time.append(np.array(i for i in range(len(val_data[i]))))
+        for i in range(train_data_len):
+            train_time[i] = torch.full((train_data.shape[1], train_data.shape[2]), i)
 
-        for i in range(len(test_data)):
-            test_time.append(np.array(i for i in range(len(test_data[i]))))
-        
-        train_time = np.reshape(train_time, (len(train_time[0]), len(train_time), 1))
-        val_time = np.reshape(val_time, (len(val_time[0]), len(val_time), 1))
-        test_time = np.reshape(test_time, (len(test_time[0]), len(test_time), 1))
+        for i in range(train_data_len, train_data_len + val_data_len):
+            val_time[i - train_data_len] = torch.full((val_data.shape[1], val_data.shape[2]), i)
+
+        for i in range(train_data_len + val_data_len, train_data_len + val_data_len + test_data_len):
+            test_time[i - train_data_len - val_data_len] = torch.full((test_data.shape[1], test_data.shape[2]), i)
 
         return train_time, val_time, test_time
+
+    def zero_interpolation(self, train_data, val_data, test_data):
+        torch.nan_to_num(train_data)
+        torch.nan_to_num(val_data)
+        torch.nan_to_num(test_data)
+
+    def average_interpolation(self, train_data, val_data, test_data):
+        pass
 
 def read_data(filename):
     """
@@ -107,4 +116,7 @@ def gen_batch(x, t, start_row, end_row, n_sample=100):
         t0_idx = 0
         tM_idx = time_len
     
-    return x[t0_idx:tM_idx, start_row:end_row], t[start_row: end_row] 
+    return x[t0_idx:tM_idx, start_row:end_row], t[t0_idx:tM_idx, start_row: end_row] 
+
+if __name__ == '__main__':
+    train_data, val_data, test_data, train_time, val_time, test_time = run()

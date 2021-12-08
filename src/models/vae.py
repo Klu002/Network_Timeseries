@@ -1,15 +1,13 @@
-from _typeshed import Self
 import math 
 import numpy as np
-from models.cde_funcs import ODEFunc
 
 import torch
 from torch import Tensor
 from torch import nn
-from torch.nn import Functional as F
 from torch.autograd import Variable
 
-from utils import reparameterize
+from .ode_funcs import NeuralODE, ODEFunc
+from .utils import reparameterize
 
 class RNNEncoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim):
@@ -29,10 +27,9 @@ class RNNEncoder(nn.Module):
 
         # concatenate input
         xt = torch.cat((x, t), dim=-1)
-        xt = xt[::-1]
 
         # sample from initial encoding
-        _, h0 = self.rnn(xt)
+        _, h0 = self.rnn(xt.flip((0,)).float())
         z0 = self.hid2lat(h0[0])
         mu = z0[:, :self.latent_dim]
         logvar = z0[:, self.latent_dim:]
@@ -55,9 +52,11 @@ class NeuralODEDecoder(nn.Module):
             z0: 
             t: number of timesteps
         """
+        t = torch.squeeze(t)
+
         zs = self.ode(z0, t)
         hs = self.l2h(zs)
-        xs = Self.h2o(hs)
+        xs = self.h2o(hs)
 
         return xs
 
@@ -76,9 +75,9 @@ class ODEVAE(nn.Module):
         if MAP:
             z = mu
         else:
-            z = reparametrize(mu, logvar)
+            z = reparameterize(mu, logvar)
 
-        x_p = self.decoder(z, t)
+        x_p = self.neural_decoder(z, t)
         return x_p, z, mu, logvar
 
 def loss_function(x_p, x, z, mu, logvar):
