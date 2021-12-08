@@ -247,3 +247,4 @@ def generate_spirals():
     samp_ts = times
 
     return orig_trajs, samp_trajs, samp_ts
+

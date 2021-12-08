@@ -1,4 +1,6 @@
 import math
+
+from numpy.core.numeric import NaN
 import torch
 import torchcde
 import numpy as np
@@ -16,16 +18,19 @@ def train(device, model, optimizer, loss_func, train_data, train_time, learning_
     num_batches = math.ceil(train_data.shape[1]/batch_size)
     print("Num batches: ", num_batches)
 
-    # batch_order_permutation = np.random.permutation(train_data.shape[1])
-    # np.random.shuffle(batch_order_permutation)
+    batch_order_permutation = np.random.permutation(train_data.shape[1])
+    np.random.shuffle(batch_order_permutation)
 
     for i in range(num_batches):
       try:
         optimizer.zero_grad()
 
-        # batch_indices = batch_order_permutation[i*batch_size:(i+1)*batch_size]
-        batch_x, batch_t = gen_batch(train_data, train_time, i * batch_size, batch_size, n_sample)
-        # print("Batch shape: ", batch_x.shape, batch_t.shape)
+        if i == num_batches - 1:
+          batch_indices = batch_order_permutation[i*batch_size:]
+        else:
+          batch_indices = batch_order_permutation[i*batch_size:(i+1)*batch_size]
+        batch_x, batch_t = gen_batch(train_data, train_time, batch_indices, n_sample)
+        print("Batch shape: ", batch_x.shape, batch_t.shape)
 
         max_len = np.random.choice([batch_t.shape[0]//3, batch_t.shape[0]//2, batch_t.shape[0]])
         permutation = np.random.permutation(batch_t.shape[0])
@@ -43,7 +48,7 @@ def train(device, model, optimizer, loss_func, train_data, train_time, learning_
         losses.append(loss.item())
 
         print(f"\tBatch {i}")
-        print(loss.item())
+        print("\t{}".format(loss.item()))
 
         if epoch_idx > 0 and epoch_idx % 10 == 0 and ckpt_path:
           torch.save({
@@ -114,11 +119,9 @@ def main():
     data_path = args.load_dir
     ld = LoadInput(data_path)
     train_data, val_data, test_data = ld.split_train_val_test()
-    train_data, val_data, test_data = ld.load_data(train_data, val_data, test_data)
-    train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
 
-    # Interpolation method to replace NaN values with numerical values
-    train_data, val_data, test_data = ld.zero_interpolation(train_data, val_data, test_data)
+    train_data, val_data, test_data = ld.load_average_interpolation(train_data, val_data, test_data)
+    train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
 
   output_dim = 1
   hidden_dim = 64
@@ -176,7 +179,7 @@ def main():
   done_training = True
   if args.training_save_dir and args.model_name:
     ckpt_path = os.path.join(args.training_save_dir, args.model_name)
-    trained_epochs = train(device, model, optim, loss_func, train_data, train_time, lr, batch_size, epochs, n_sample, ckpt_path)
+    trained_epochs = train(device, model, optim, loss_func, train_data[:, :1000, :], train_time[:, :1000, :], lr, batch_size, epochs, n_sample, ckpt_path)
 
     print('Trained for {} epochs'.format(trained_epochs))
     if trained_epochs > 0 and trained_epochs < epochs:
@@ -187,7 +190,7 @@ def main():
     if trained_epochs < epochs:
       done_training = False
   else:
-    trained_epochs = train(device, model, optim, loss_func, train_data, train_time, lr, batch_size, epochs, n_sample)
+    trained_epochs = train(device, model, optim, loss_func, train_data[:, :1000, :], train_time[:, :1000, :], lr, batch_size, epochs, n_sample)
     if trained_epochs < epochs:
       done_training = False
 

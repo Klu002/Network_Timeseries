@@ -38,6 +38,6 @@ class NeuralODE(nn.Module):
 
         # TODO: pass in t to ODE solver row by row then concatenate
         # output hidden states and pad
-        pred_z = odeint(self.func, z0, t)
+        pred_z = odeint(self.func, z0, t, method='dopri8')
 
         return pred_z
