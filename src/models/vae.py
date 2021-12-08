@@ -96,11 +96,11 @@ def vae_loss_function(x_p, x, z, mu, logvar):
     return loss
 
 def differentiable_smape(y_true, y_pred, mask, epsilon=0.1):
-    constant_and_epsilon = torch.tensor(0.5 + epsilon).repeat(y_true.shape)
+    constant_and_epsilon = torch.tensor(0.5 + epsilon).repeat(y_true.shape).to('cuda')
     summ = torch.maximum(torch.abs(y_true) + torch.abs(y_pred) + epsilon, constant_and_epsilon)
-    smape = torch.abs(y_pred - y_true) / summ
+    smape = (torch.abs(y_pred - y_true) / summ)
 
-    nvalid = torch.sum(mask)
+    nvalid = (torch.sum(mask))
     smape_sum = torch.sum(smape * mask) / nvalid
     return smape_sum
 
@@ -133,12 +133,12 @@ def mae(y_true, y_pred, mask):
 
 def train_smape_loss(y_true, y_pred):
     mask = torch.isfinite(y_true)
-    weight_mask = mask.type(torch.FloatTensor)
+    weight_mask = mask.type(torch.FloatTensor).to('cuda')
     
     return differentiable_smape(y_true, y_pred, weight_mask)
 
 def test_smape_loss(y_true, y_pred):
     mask = torch.isfinite(y_true)
-    weight_mask = mask.type(torch.FloatTensor)
+    weight_mask = mask.type(torch.FloatTensor).to('cuda')
     
     return kaggle_smape(y_true, y_pred, weight_mask)

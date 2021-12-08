@@ -45,6 +45,8 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
         batch_x, batch_t = batch_x.to(device), batch_t.to(device)
 
         x_p, z, z_mean, z_log_var = model(batch_x, batch_t)
+        x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
+
         # If loss function = SMAPE, don't have to divide by max_len. 
         # If loss function = VAE_loss, must divide by max len.
         differentiable_smape_loss = train_loss_func(batch_x, x_p)
