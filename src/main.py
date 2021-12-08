@@ -166,7 +166,7 @@ def main():
     ld = LoadInput(data_path)
     train_data, val_data, test_data = ld.split_train_val_test()
 
-    train_data, val_data, test_data = ld.load_zero_interpolation(train_data, val_data, test_data)
+    train_data, val_data, test_data = ld.load_median_interpolation(train_data, val_data, test_data)
     train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
 
   output_dim = 1
