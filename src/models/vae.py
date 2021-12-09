@@ -112,9 +112,9 @@ def vae_loss_function(x_p, x, z, mu, logvar):
 def differentiable_smape(device, y_true, y_pred, mask, epsilon=0.1):
     constant_and_epsilon = torch.tensor(0.5 + epsilon).repeat(y_true.shape).to(device)
     summ = torch.maximum(torch.abs(y_true) + torch.abs(y_pred) + epsilon, constant_and_epsilon)
-    smape = torch.abs(y_pred - y_true) / summ
+    smape = (torch.abs(y_pred - y_true) / summ)
 
-    nvalid = torch.sum(mask)
+    nvalid = (torch.sum(mask))
     smape_sum = torch.sum(smape * mask) / nvalid
     return smape_sum
 
