@@ -9,7 +9,7 @@ import os
 import argparse
 import time
 from models.vae import ODEVAE, train_smape_loss, train_mae_loss, test_smape_loss, vae_loss_function
-from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_time
+from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_average_interpolation, load_time
 
 import matplotlib.pyplot as plt
 
@@ -53,17 +53,10 @@ def train(device, model_name, model, optimizer, train_loss_func, test_loss_func,
 
         batch_x, batch_t = batch_x[permutation], batch_t[permutation]
         batch_x, batch_t = batch_x.to(device), batch_t.to(device)
-        
-        # b = time.time()
-        # print("before model")
         x_p, z, z_mean, z_log_var = model(batch_x, batch_t, batch_t)
         x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
         x_p = torch.round(x_p)
         x_p[x_p < 0] = 0
-
-        # e = time.time()
-        # print("after model")
-        # print("Time taken model: {}".format(round(e - b, 3)))
 
         if i % 20 == 0:
           batch_x_plot = np.squeeze(batch_x.detach().cpu().numpy(), 2)
@@ -80,25 +73,14 @@ def train(device, model_name, model, optimizer, train_loss_func, test_loss_func,
         # If loss function = SMAPE, don't have to divide by max_len. 
         # If loss function = VAE_loss, must divide by max len.
 
-        # b = time.time()
-        # print("before loss calculation")
         mae_loss = train_loss_func(device, batch_x, x_p)
         kaggle_smape_loss = test_loss_func(device, batch_x, x_p)
-        # e = time.time()
-        # print("after loss calculation")
-        # print("Time taken loss: {}".format(round(e - b, 3)))
 
         # loss = loss_func(x_p, batch_x, z, z_mean, z_log_var)
         # loss /= max_len
 
-        # b = time.time()
-        # print("before loss backprop")
         mae_loss.backward()
         optimizer.step()
-        # e = time.time()
-        # print("after loss backprop")
-        # print("Time taken backprop: {}".format(round(e - b, 3)))
-
         losses.append(mae_loss.item())
 
         end_time = time.time()
@@ -188,7 +170,7 @@ def main():
     data_path = args.load_dir
     ld = LoadInput(data_path)
     train_data, _, _ = ld.split_train_val_test(1, 0, 0)
-    train_data, _, _ = load_median_interpolation(train_data, None, None)
+    train_data, _, _ = load_average_interpolation(train_data, None, None)
     train_time, _, _ = load_time(train_data, None, None)
 
   output_dim = 1
