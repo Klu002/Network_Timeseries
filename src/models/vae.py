@@ -110,7 +110,7 @@ def vae_loss_function(device, x_p, x, z, mu, logvar):
 
     return loss
 
-def mean_absolute_percentage_error(device, y_true, y_pred):
+def mape(device, y_true, y_pred):
     return torch.mean(torch.abs((y_pred - y_true)) / y_true) * 100
 
 def differentiable_smape(device, y_true, y_pred, epsilon=0.1):
@@ -138,6 +138,13 @@ def mae(device, y_true, y_pred, mult_factor=1):
     y_true_log = torch.log1p(y_true)
     y_pred_log = torch.log1p(y_pred)
     error = torch.abs(y_true_log - y_pred_log) * mult_factor
+
+    return torch.mean(error)
+
+def mse(device, y_true, y_pred, mult_factor=1):
+    y_true_log = torch.log1p(y_true)
+    y_pred_log = torch.log1p(y_pred)
+    error = torch.pow(y_true_log - y_pred_log, 2) * mult_factor
 
     return torch.mean(error)
 

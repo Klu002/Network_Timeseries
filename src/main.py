@@ -237,7 +237,7 @@ def main():
         # n_sample = checkpoint['args'].n_sample
         last_epoch_saved = ckpt_path[:-4].rsplit("_", 1)
         if last_epoch_saved[1].isnumeric():
-          args.model_name = last_epoch_saved[0]
+          args.model_name = last_epoch_saved[0].rsplit("/", 1)[1]
           print("Model name changed to: ", args.model_name)
         print('Loaded checkpoint from {}'.format(ckpt_path))
 
