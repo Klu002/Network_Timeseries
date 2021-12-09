@@ -1,6 +1,8 @@
 import seaborn as sb
 import matplotlib.pyplot as plt
-
+import numpy as np
+import os
+import torch
 from data.preprocess import mape, differentiable_smape, rounded_smape, kaggle_smape, mae, mse
 
 # sns.set_theme(style="darkgrid")
@@ -27,6 +29,23 @@ def visualize_loss_real_results(y_true, y_pred, x, save_path):
 # TODO: Add loss plot for various functions
 
 # TODO: Add diagram showing architecture of the neural network
+
+def visualize_loss_history(dir_path, model_name, save_dir=None):
+    """
+    Takes in a path to a directory, returns loss history of all files with model_name
+    """
+    loss_history = []
+    for file in os.listdir(dir_path):
+        if file.startswith(model_name):
+            model_info = torch.load(file)
+            loss = model_info['losses']
+            loss_history.extend(loss)
+    
+    batch = range(len(loss_history))
+    plt.plot(batch, loss_history)
+    if save_dir:
+        plt.savefig(save_dir + "/" + model_name + "loss_history")
+    plt.show()
 
 if __name__ == "__main__":
     pass
