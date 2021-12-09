@@ -98,9 +98,7 @@ class ODEVAE(nn.Module):
         else:
             z = reparameterize(mu, logvar)
         # x_p = self.neural_decoder(z, t).permute(1, 0, 2)
-        print("Before decoder")
         x_p = self.neural_decoder(z, t_decoder)
-        print("After decoder")
         return x_p, z, mu, logvar
 
 def vae_loss_function(device, x_p, x, z, mu, logvar):
