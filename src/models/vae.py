@@ -5,6 +5,7 @@ import torch
 from torch import Tensor
 from torch import nn
 from torch.autograd import Variable
+import time
 
 # from models.ode_funcs import NeuralODE, ODEFunc
 from models.ode_funcs import ODEFunc, NeuralODE
@@ -96,9 +97,10 @@ class ODEVAE(nn.Module):
             z = mu
         else:
             z = reparameterize(mu, logvar)
-
         # x_p = self.neural_decoder(z, t).permute(1, 0, 2)
+        print("Before decoder")
         x_p = self.neural_decoder(z, t_decoder)
+        print("After decoder")
         return x_p, z, mu, logvar
 
 def vae_loss_function(device, x_p, x, z, mu, logvar):

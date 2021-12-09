@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from torchdiffeq import odeint_adjoint as odeint
+import time
 
 class ODEFunc(nn.Module):
     def __init__(self, latent_dim, hidden_dim, time_invariant=False):
