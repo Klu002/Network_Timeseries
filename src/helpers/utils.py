@@ -16,17 +16,17 @@ def call_gru_d(gru_d, input):
 
     gru_input = []
     for i in range(input.shape[0]):
-        X = input[i, :2, :]
+        X = input[i, :-1, :]
         m = torch.where(torch.isnan(X), 0, 1)
-        time = input[i, 2, :]
+        time = input[i,-1, :]
         delta = torch.zeros(X.shape)
 
         for t in range(input.shape[2]):
             #delta[t] = t_diff[t] if m[t] == 1 else delta[t-1] + t_diff[t]
             delta[:,t] = time[t] + (m[:, t] - 1) * delta[:, t-1]
-
-    stacked = torch.stack([X, m, delta])
-    gru_input.append(stacked)
+        
+        stacked = torch.stack([X, m, delta])
+        gru_input.append(stacked)
 
     #gruD input size = (batch_size, 3, 2, num_time)
     #gruD input = (batch_size, (X, m, delta))

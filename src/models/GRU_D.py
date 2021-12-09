@@ -54,12 +54,14 @@ class GRUD_cell(torch.nn.Module):
             self.output_size = output_size
         else:
             self.output_size = hidden_size
+            output_size = hidden_size
+
         self.num_layers = num_layers
 
         #controls the output, True if another GRU-D layer follows
         self.return_hidden = return_hidden 
 
-        x_mean = torch.tensor(x_mean, requires_grad = True)
+        x_mean = torch.tensor(x_mean, dtype=torch.float32, requires_grad = True)
         self.register_buffer('x_mean', x_mean)
         self.bias = bias
         self.batch_first = batch_first
@@ -77,7 +79,7 @@ class GRUD_cell(torch.nn.Module):
                           "recurrent layer, so non-zero dropout expects "
                           "num_layers greater than 1, but got dropout={} and "
                           "num_layers={}".format(dropout, num_layers))
-        
+       
         #set up all the operations that are needed in the forward pass
         self.w_dg_x = torch.nn.Linear(input_size,input_size, bias=True)
         self.w_dg_h = torch.nn.Linear(input_size, hidden_size, bias = True)
@@ -132,10 +134,10 @@ class GRUD_cell(torch.nn.Module):
         #iterate over seq
         for timestep in range(X.size()[2]):
             
-            x = torch.squeeze(X[:,:,timestep])
-            m = torch.squeeze(Mask[:,:,timestep])
-            d = torch.squeeze(Delta[:,:,timestep])
-            
+            x = X[:,:,timestep]
+            m = Mask[:,:,timestep]
+            d = Delta[:,:,timestep]
+
             gamma_x = torch.exp(-1* torch.nn.functional.relu( self.w_dg_x(d) ))
             gamma_h = torch.exp(-1* torch.nn.functional.relu( self.w_dg_h(d) ))
 

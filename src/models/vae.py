@@ -14,7 +14,7 @@ from models.GRU_D import GRUD_cell
 np.set_printoptions(threshold=500)
 
 class RNNEncoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim, encoder='grud'):
+    def __init__(self, input_dim, hidden_dim, latent_dim, encoder='gru'):
         super(RNNEncoder, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -43,11 +43,11 @@ class RNNEncoder(nn.Module):
         if self.encoder == 'gru':
              _, h0 = self.rnn(xt.flip((0,)).float())
         elif self.encoder == 'grud':
-             _, h0 = call_gru_d(self.rnn, xt.flip((0,)).float())
+            _, h0 = call_gru_d(self.rnn, xt.flip((0,)).float())
+            h0 = torch.permute(torch.unsqueeze(h0[:, -1, :], 1), (1, 0, 2)) 
         else:
             raise ValueError("Invalid encoder! Encoder specified: {}, Allowed Encoders: {}".format(self.encoder, self.allowed_encoders))
 
-       
         z0 = self.hid2lat(h0[0])
         mu = z0[:, :self.latent_dim]
         logvar = z0[:, self.latent_dim:]
