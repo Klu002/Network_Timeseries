@@ -15,12 +15,12 @@ import matplotlib.pyplot as plt
 
 np.set_printoptions(threshold=500)
 
-def plot_versus(x, x_p, x_start, x_end):
+def plot_versus(x, x_p, x_start, x_end, save_path):
   plt.plot(x, label='True')
   plt.plot(x_p, label='Pred')
   plt.xticks(np.arange(x_start, x_end, 10))
   plt.legend()
-  plt.show()
+  plt.savefig(save_path)
 
 # TODO: Use cuda device instead of doing everything on CPU
 def train(device, model, optimizer, train_loss_func, test_loss_func, train_data, train_time, learning_rate, batch_size, epoch_idx, epochs, n_sample, ckpt_path=None, use_cuda=False):  
@@ -57,34 +57,33 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
         x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
         x_p[x_p < 0] = 0
 
-        batch_x_plot = np.squeeze(batch_x.detach().cpu().numpy(), 2)
-        x_p_plot = np.squeeze(x_p.detach().cpu().numpy(), 2)
-        x_values = np.squeeze(batch_t.detach().cpu().numpy(), 2)
-        x_start = x_values[:, 0][0]
-        x_end = x_values[:, 0][-1]
-        plot_versus(batch_x_plot[:, 0], x_p_plot[:, 0], x_start, x_end)
+        if i % 20 == 0:
+          batch_x_plot = np.squeeze(batch_x.detach().cpu().numpy(), 2)
+          x_p_plot = np.squeeze(x_p.detach().cpu().numpy(), 2)
+          x_values = np.squeeze(batch_t.detach().cpu().numpy(), 2)
+          x_start = x_values[:, 0][0]
+          x_end = x_values[:, 0][-1]
 
-        print(batch_x_plot[:, 0])
-        print(x_p_plot[:, 0])
+          plot_versus(batch_x_plot[:, 0], x_p_plot[:, 0], x_start, x_end, '../saved/images/epoch_{}_batch_{}'.format(epoch_idx, i))
 
         # with np.printoptions(threshold=50):
         #   print("True x: ", batch_x)
         #   print("Pred x: ", x_p)
         # If loss function = SMAPE, don't have to divide by max_len. 
         # If loss function = VAE_loss, must divide by max len.
-        differentiable_smape_loss = train_loss_func(device, batch_x, x_p)
+        mae_loss = train_loss_func(device, batch_x, x_p)
         kaggle_smape_loss = test_loss_func(device, batch_x, x_p)
         # loss = loss_func(x_p, batch_x, z, z_mean, z_log_var)
         # loss /= max_len
-        differentiable_smape_loss.backward()
+        mae_loss.backward()
         optimizer.step()
-        losses.append(differentiable_smape_loss.item())
+        losses.append(mae_loss.item())
 
         end_time = time.time()
         time_taken = end_time - start_time
 
         print("Batch {}/{}".format(i + 1, num_batches))
-        print("{}s - differentiable_smape: {} - kaggle_smape: {}".format(round(time_taken, 3), round(differentiable_smape_loss.item(), 3), round(kaggle_smape_loss.item(), 3)))
+        print("{}s - mae: {} - kaggle_smape: {}".format(round(time_taken, 3), round(mae_loss.item(), 3), round(kaggle_smape_loss.item(), 3)))
 
       except KeyboardInterrupt:
         return epoch_idx, losses
@@ -211,7 +210,7 @@ def main():
 
   model = ODEVAE(output_dim, hidden_dim, latent_dim).to(device)
   optim = torch.optim.Adam(model.parameters(), betas=(0.9, 0.999), lr=lr)
-  train_loss_func = train_smape_loss
+  train_loss_func = train_mae_loss
   test_loss_func = test_smape_loss
   # loss_func = vae_loss_function
   # loss_meter = RunningAverageMeter()

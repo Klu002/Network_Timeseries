@@ -137,7 +137,7 @@ def kaggle_smape(device, y_true, y_pred):
 def mae(device, y_true, y_pred):
     y_true_log = torch.log1p(y_true)
     y_pred_log = torch.log1p(y_pred)
-    error = torch.abs(y_true_log - y_pred_log)/2
+    error = torch.abs(y_true_log - y_pred_log)
 
     return torch.mean(error)
 
