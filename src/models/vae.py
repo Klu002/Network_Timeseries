@@ -9,18 +9,25 @@ from torch.autograd import Variable
 # from models.ode_funcs import NeuralODE, ODEFunc
 from models.ode_funcs import ODEFunc, NeuralODE
 from models.spirals import NNODEF
-from helpers.utils import reparameterize
-
+from helpers.utils import reparameterize, call_gru_d
+from GRU_D import GRUD_cell
 np.set_printoptions(threshold=500)
 
 class RNNEncoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim):
+    def __init__(self, input_dim, hidden_dim, latent_dim, encoder='gru'):
         super(RNNEncoder, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
+        self.encoder = encoder
+        self.allowed_encoders = ['gru', 'grud']
+        if encoder == 'gru':
+            self.rnn = nn.GRU(input_dim + 1, hidden_dim)
+        elif encoder == 'grud':
+            self.rnn = GRUD_cell(input_dim, hidden_dim)
+        else:
+            raise ValueError("Invalid encoder! Encoder specified: {}, Allowed Encoders: {}".format(encoder, self.allowed_encoders))
 
-        self.rnn = nn.GRU(input_dim + 1, hidden_dim)
         self.hid2lat = nn.Linear(hidden_dim, 2 * latent_dim)
 
     def forward(self, x, t):
@@ -33,7 +40,14 @@ class RNNEncoder(nn.Module):
         xt = torch.cat((x, t), dim=-1)
 
         # sample from initial encoding
-        _, h0 = self.rnn(xt.flip((0,)).float())
+        if self.encoder == 'gru':
+             _, h0 = self.rnn(xt.flip((0,)).float())
+        elif self.encoder == 'grud':
+             _, h0 = call_gru_d(self.rnn, xt.flip((0,)).float())
+        else:
+            raise ValueError("Invalid encoder! Encoder specified: {}, Allowed Encoders: {}".format(self.encoder, self.allowed_encoders))
+
+       
         z0 = self.hid2lat(h0[0])
         mu = z0[:, :self.latent_dim]
         logvar = z0[:, self.latent_dim:]
@@ -66,13 +80,13 @@ class NeuralODEDecoder(nn.Module):
         return xs
 
 class ODEVAE(nn.Module):
-    def __init__(self, output_dim, hidden_dim, latent_dim):
+    def __init__(self, output_dim, hidden_dim, latent_dim, encoder='gru'):
         super(ODEVAE, self).__init__()
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
 
-        self.rnn_encoder = RNNEncoder(output_dim, hidden_dim, latent_dim)
+        self.rnn_encoder = RNNEncoder(output_dim, hidden_dim, latent_dim, encoder=encoder)
         self.neural_decoder = NeuralODEDecoder(output_dim, hidden_dim, latent_dim)
         
     def forward(self, x, t, MAP=False):
