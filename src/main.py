@@ -8,14 +8,15 @@ import numpy as np
 import os
 import argparse
 import time
-from models.vae import ODEVAE, train_smape_loss, test_smape_loss, vae_loss_function
-from data.preprocess import LoadInput, read_data, gen_batch
+from models.vae import ODEVAE, train_smape_loss, train_mae_loss, test_smape_loss, vae_loss_function
+from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_time
 
 np.set_printoptions(threshold=500)
 
 # TODO: Use cuda device instead of doing everything on CPU
-def train(device, model, optimizer, train_loss_func, test_loss_func, train_data, train_time, learning_rate, batch_size, epochs, n_sample, ckpt_path=None, use_cuda=False):  
-  for epoch_idx in range(epochs):
+def train(device, model, optimizer, train_loss_func, test_loss_func, train_data, train_time, learning_rate, batch_size, epoch_idx, epochs, n_sample, ckpt_path=None, use_cuda=False):  
+  epoch_losses = []
+  for epoch_idx in range(epoch_idx, epochs):
     losses = []
     num_batches = math.ceil(train_data.shape[1]/batch_size)
     print("Num batches: {}\n".format(num_batches))
@@ -43,12 +44,13 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
         batch_x, batch_t = batch_x[permutation], batch_t[permutation]
         batch_x, batch_t = batch_x.to(device), batch_t.to(device)
 
-        x_p, z, z_mean, z_log_var = model(batch_x, batch_t)
+        x_p, z, z_mean, z_log_var = model(batch_x, batch_t, batch_t)
         x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
+        x_p[x_p < 0] = 0
 
-        with np.printoptions(threshold=50):
-          print("True x: ", batch_x)
-          print("Pred x: ", x_p)
+        # with np.printoptions(threshold=50):
+        #   print("True x: ", batch_x)
+        #   print("Pred x: ", x_p)
         # If loss function = SMAPE, don't have to divide by max_len. 
         # If loss function = VAE_loss, must divide by max len.
         differentiable_smape_loss = train_loss_func(device, batch_x, x_p)
@@ -65,17 +67,24 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
         print("Batch {}/{}".format(i + 1, num_batches))
         print("{}s - differentiable_smape: {} - kaggle_smape: {}".format(round(time_taken, 3), round(differentiable_smape_loss.item(), 3), round(kaggle_smape_loss.item(), 3)))
 
-        if epoch_idx > 0 and epoch_idx % 10 == 0 and ckpt_path:
-          torch.save({
-            'model_state_dict': model.state_dict(),
-          }, ckpt_path + '_' + str(epoch_idx) + '.pth')
-          print('Saved model at {}'.format(ckpt_path + '_' + str(epoch_idx) + '.pth'))
-
       except KeyboardInterrupt:
-        return epoch_idx - 1
+        return epoch_idx, losses
 
-    print("Epoch {}/{}".format(epoch_idx, epochs))
+    epoch_losses.append(losses)
+
+    if epoch_idx > 0 and epoch_idx % 1 == 0 and ckpt_path:
+      torch.save({
+        'model_state_dict': model.state_dict(),
+        'epoch_idx': epoch_idx,
+        'num_epochs': epochs,
+        'losses': epoch_losses,
+      }, ckpt_path + '_' + str(epoch_idx + 1) + '.pth')
+      print('Saved model at {}'.format(ckpt_path + '_' + str(epoch_idx + 1) + '.pth'))
+    
+    print("Epoch {}/{}".format(epoch_idx + 1, epochs))
     print("mean differentiable_smape: {} - median differentiable_smape: {}\n".format(np.mean(losses), np.median(losses)))
+
+  return epoch_idx + 1, epoch_losses
     
 # class RunningAverageMeter(object):
 #   """Computes and stores the average and current value"""
@@ -157,12 +166,13 @@ def main():
     ld = LoadInput(data_path)
     train_data, val_data, test_data = ld.split_train_val_test()
 
-    train_data, val_data, test_data = ld.load_average_interpolation(train_data, val_data, test_data)
-    train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
+    train_data, val_data, test_data = load_median_interpolation(train_data, val_data, test_data)
+    train_time, val_time, test_time = load_time(train_data, val_data, test_data)
 
   output_dim = 1
   hidden_dim = 64
   latent_dim = 6
+  epoch_idx = 0
   epochs = args.epochs
   lr = args.lr
   batch_size = args.batch_size
@@ -198,6 +208,8 @@ def main():
       if os.path.exists(ckpt_path):
         checkpoint = torch.load(ckpt_path)
         model.load_state_dict(checkpoint['model_state_dict'])
+        if 'epoch_idx' in checkpoint:
+          epoch_idx = checkpoint['epoch_idx']
         # optim.load_state_dict(checkpoint['optimizer_state_dict'])
 
         # train_data = checkpoint['train_data']
@@ -218,18 +230,21 @@ def main():
   done_training = True
   if args.training_save_dir and args.model_name:
     ckpt_path = os.path.join(args.training_save_dir, args.model_name)
-    trained_epochs = train(device, model, optim, train_loss_func, test_loss_func, train_data, train_time, lr, batch_size, epochs, n_sample, ckpt_path)
+    trained_epochs, losses = train(device, model, optim, train_loss_func, test_loss_func, train_data, train_time, lr, batch_size, epoch_idx, epochs, n_sample, ckpt_path)
 
     print('Trained for {} epochs'.format(trained_epochs))
     if trained_epochs > 0 and trained_epochs < epochs:
       torch.save({
         'model_state_dict': model.state_dict(),
+        'epoch_idx': trained_epochs - 1,
+        'num_epochs': epochs,
+        'losses': losses
       }, ckpt_path + '_' + str(trained_epochs) + '.pth')
       
     if trained_epochs < epochs:
       done_training = False
   else:
-    trained_epochs = train(device, model, optim, train_loss_func, test_loss_func, train_data, train_time, lr, batch_size, epochs, n_sample)
+    trained_epochs, losses = train(device, model, optim, train_loss_func, test_loss_func, train_data, train_time, lr, batch_size, epoch_idx, epochs, n_sample)
     if trained_epochs < epochs:
       done_training = False
 
@@ -244,6 +259,7 @@ def main():
       'train_time': train_time,
       'val_time': val_time,
       'test_time': test_time, 
+      'losses': losses,
       'args': args
     }, final_model_path)
     print('Saved model at {}'.format(final_model_path))
