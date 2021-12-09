@@ -44,6 +44,7 @@ class GRUD_cell(torch.nn.Module):
     def __init__(self, input_size, hidden_size, output_size=None, num_layers=1, x_mean=0,\
                  bias=True, batch_first=False, bidirectional=False, dropout_type='mloss', dropout=0, return_hidden = False):
 
+        print("Initializing GRU-D cell..")
         use_cuda = torch.cuda.is_available()
         device = torch.device("cuda:0" if use_cuda else "cpu")
         
