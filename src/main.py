@@ -11,7 +11,17 @@ import time
 from models.vae import ODEVAE, train_smape_loss, train_mae_loss, test_smape_loss, vae_loss_function
 from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_time
 
+import matplotlib.pyplot as plt
+
 np.set_printoptions(threshold=500)
+
+def plot_versus(x, x_p, x_start, x_end, save_path):
+  plt.plot(x, label='True')
+  plt.plot(x_p, label='Pred')
+  plt.xticks(np.arange(x_start, x_end, 25))
+  plt.legend()
+  plt.savefig(save_path)
+  plt.clf()
 
 # TODO: Use cuda device instead of doing everything on CPU
 def train(device, model, optimizer, train_loss_func, test_loss_func, train_data, train_time, learning_rate, batch_size, epoch_idx, epochs, n_sample, ckpt_path=None, use_cuda=False):  
@@ -48,24 +58,33 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
         x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
         x_p[x_p < 0] = 0
 
+        if i % 20 == 0:
+          batch_x_plot = np.squeeze(batch_x.detach().cpu().numpy(), 2)
+          x_p_plot = np.squeeze(x_p.detach().cpu().numpy(), 2)
+          x_values = np.squeeze(batch_t.detach().cpu().numpy(), 2)
+          x_start = x_values[:, 0][0]
+          x_end = x_values[:, 0][-1]
+
+          plot_versus(batch_x_plot[:, 0], x_p_plot[:, 0], x_start, x_end, '../saved/images/ODE_GRU_MAE_epoch_{}_batch_{}'.format(epoch_idx, i))
+
         # with np.printoptions(threshold=50):
         #   print("True x: ", batch_x)
         #   print("Pred x: ", x_p)
         # If loss function = SMAPE, don't have to divide by max_len. 
         # If loss function = VAE_loss, must divide by max len.
-        differentiable_smape_loss = train_loss_func(device, batch_x, x_p)
+        mae_loss = train_loss_func(device, batch_x, x_p)
         kaggle_smape_loss = test_loss_func(device, batch_x, x_p)
         # loss = loss_func(x_p, batch_x, z, z_mean, z_log_var)
         # loss /= max_len
-        differentiable_smape_loss.backward()
+        mae_loss.backward()
         optimizer.step()
-        losses.append(differentiable_smape_loss.item())
+        losses.append(mae_loss.item())
 
         end_time = time.time()
         time_taken = end_time - start_time
 
         print("Batch {}/{}".format(i + 1, num_batches))
-        print("{}s - differentiable_smape: {} - kaggle_smape: {}".format(round(time_taken, 3), round(differentiable_smape_loss.item(), 3), round(kaggle_smape_loss.item(), 3)))
+        print("{}s - mae: {} - kaggle_smape: {}".format(round(time_taken, 3), round(mae_loss.item(), 3), round(kaggle_smape_loss.item(), 3)))
 
       except KeyboardInterrupt:
         return epoch_idx, losses
@@ -146,7 +165,8 @@ def main():
   parser.add_argument('--model_save_dir', type=str, default=None, help='Path for save checkpoints')
   parser.add_argument('--training_save_dir', type=str, default=None, help='Path for saving model weights while training')
   parser.add_argument('--model_name', type=str, default='ODE', help='Name of model for save checkpoints')
-  
+
+  parser.add_argument('--encoder', type=str, default='gru')
   parser.add_argument('--use_cuda', type=eval, default=False)
   parser.add_argument('--visualize', type=eval, default=False)
   args = parser.parse_args()
@@ -164,10 +184,10 @@ def main():
     print('Loading data from file...')
     data_path = args.load_dir
     ld = LoadInput(data_path)
-    train_data, val_data, test_data = ld.split_train_val_test()
+    train_data, _, _ = ld.split_train_val_test(1, 0, 0)
 
-    train_data, val_data, test_data = load_median_interpolation(train_data, val_data, test_data)
-    train_time, val_time, test_time = load_time(train_data, val_data, test_data)
+    train_data, _, _ = load_median_interpolation(train_data, None, None)
+    train_time, _, _ = load_time(train_data, None, None)
 
   output_dim = 1
   hidden_dim = 64
@@ -184,15 +204,15 @@ def main():
   print("Using device: ", device)
 
   train_data = train_data.to(device)
-  val_data = val_data.to(device)
-  test_data = test_data.to(device)
+  # val_data = val_data.to(device)
+  # test_data = test_data.to(device)
   train_time = train_time.to(device)
-  val_time = val_time.to(device)
-  test_time = test_time.to(device)
+  # val_time = val_time.to(device)
+  # test_time = test_time.to(device)
 
-  model = ODEVAE(output_dim, hidden_dim, latent_dim).to(device)
+  model = ODEVAE(output_dim, hidden_dim, latent_dim,encoder=args.encoder).to(device)
   optim = torch.optim.Adam(model.parameters(), betas=(0.9, 0.999), lr=lr)
-  train_loss_func = train_smape_loss
+  train_loss_func = train_mae_loss
   test_loss_func = test_smape_loss
   # loss_func = vae_loss_function
   # loss_meter = RunningAverageMeter()
@@ -254,11 +274,11 @@ def main():
       'model_state_dict': model.state_dict(),
       'optimizer_state_dict': optim.state_dict(),
       'train_data': train_data,
-      'val_data': val_data,
-      'test_data': test_data,
+      # 'val_data': val_data,
+      # 'test_data': test_data,
       'train_time': train_time,
-      'val_time': val_time,
-      'test_time': test_time, 
+      # 'val_time': val_time,
+      # 'test_time': test_time, 
       'losses': losses,
       'args': args
     }, final_model_path)
