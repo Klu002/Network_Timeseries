@@ -134,10 +134,10 @@ def kaggle_smape(device, y_true, y_pred):
 
     return 200 * torch.mean(smape)
 
-def mae(device, y_true, y_pred):
+def mae(device, y_true, y_pred, mult_factor=1):
     y_true_log = torch.log1p(y_true)
     y_pred_log = torch.log1p(y_pred)
-    error = torch.abs(y_true_log - y_pred_log)
+    error = torch.abs(y_true_log - y_pred_log) * mult_factor
 
     return torch.mean(error)
 

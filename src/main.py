@@ -184,10 +184,10 @@ def main():
     print('Loading data from file...')
     data_path = args.load_dir
     ld = LoadInput(data_path)
-    train_data, val_data, test_data = ld.split_train_val_test(1, 0, 0)
+    train_data, _, _ = ld.split_train_val_test(1, 0, 0)
 
-    train_data, val_data, test_data = load_median_interpolation(train_data, val_data, test_data)
-    train_time, val_time, test_time = load_time(train_data, val_data, test_data)
+    train_data, _, _ = load_median_interpolation(train_data, None, None)
+    train_time, _, _ = load_time(train_data, None, None)
 
   output_dim = 1
   hidden_dim = 64
@@ -204,11 +204,11 @@ def main():
   print("Using device: ", device)
 
   train_data = train_data.to(device)
-  val_data = val_data.to(device)
-  test_data = test_data.to(device)
+  # val_data = val_data.to(device)
+  # test_data = test_data.to(device)
   train_time = train_time.to(device)
-  val_time = val_time.to(device)
-  test_time = test_time.to(device)
+  # val_time = val_time.to(device)
+  # test_time = test_time.to(device)
 
   model = ODEVAE(output_dim, hidden_dim, latent_dim,encoder=args.encoder).to(device)
   optim = torch.optim.Adam(model.parameters(), betas=(0.9, 0.999), lr=lr)
@@ -274,11 +274,11 @@ def main():
       'model_state_dict': model.state_dict(),
       'optimizer_state_dict': optim.state_dict(),
       'train_data': train_data,
-      'val_data': val_data,
-      'test_data': test_data,
+      # 'val_data': val_data,
+      # 'test_data': test_data,
       'train_time': train_time,
-      'val_time': val_time,
-      'test_time': test_time, 
+      # 'val_time': val_time,
+      # 'test_time': test_time, 
       'losses': losses,
       'args': args
     }, final_model_path)

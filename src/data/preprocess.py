@@ -146,23 +146,25 @@ def load_time(train_data, val_data, test_data):
     """
     Load the time data in the shape of [timesteps, batch_size, features]
     """
-    train_time = torch.empty(train_data.shape)
-    val_time = torch.empty(val_data.shape)
-    test_time = torch.empty(test_data.shape)
-
-    train_data_len = len(train_data)
-    val_data_len = len(val_data)
-    test_data_len = len(test_data)
+    train_time = None
+    val_time = None
+    test_time = None
 
     if train_data is not None:
+        train_time = torch.empty(train_data.shape)
+        train_data_len = len(train_data)
         for i in range(train_data_len):
             train_time[i] = torch.full((train_data.shape[1], train_data.shape[2]), i)
     
     if val_data is not None:
+        val_time = torch.empty(val_data.shape)
+        val_data_len = len(val_data)
         for i in range(train_data_len, train_data_len + val_data_len):
             val_time[i - train_data_len] = torch.full((val_data.shape[1], val_data.shape[2]), i)
 
     if test_data is not None:
+        test_time = torch.empty(test_data.shape)
+        test_data_len = len(test_data)
         for i in range(train_data_len + val_data_len, train_data_len + val_data_len + test_data_len):
             test_time[i - train_data_len - val_data_len] = torch.full((test_data.shape[1], test_data.shape[2]), i)
 
