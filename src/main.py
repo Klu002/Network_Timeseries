@@ -11,7 +11,16 @@ import time
 from models.vae import ODEVAE, train_smape_loss, train_mae_loss, test_smape_loss, vae_loss_function
 from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_time
 
+import matplotlib.pyplot as plt
+
 np.set_printoptions(threshold=500)
+
+def plot_versus(x, x_p, x_start, x_end):
+  plt.plot(x, label='True')
+  plt.plot(x_p, label='Pred')
+  plt.xticks(np.arange(x_start, x_end, 10))
+  plt.legend()
+  plt.show()
 
 # TODO: Use cuda device instead of doing everything on CPU
 def train(device, model, optimizer, train_loss_func, test_loss_func, train_data, train_time, learning_rate, batch_size, epoch_idx, epochs, n_sample, ckpt_path=None, use_cuda=False):  
@@ -47,6 +56,16 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
         x_p, z, z_mean, z_log_var = model(batch_x, batch_t, batch_t)
         x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
         x_p[x_p < 0] = 0
+
+        batch_x_plot = np.squeeze(batch_x.detach().cpu().numpy(), 2)
+        x_p_plot = np.squeeze(x_p.detach().cpu().numpy(), 2)
+        x_values = np.squeeze(batch_t.detach().cpu().numpy(), 2)
+        x_start = x_values[:, 0][0]
+        x_end = x_values[:, 0][-1]
+        plot_versus(batch_x_plot[:, 0], x_p_plot[:, 0], x_start, x_end)
+
+        print(batch_x_plot[:, 0])
+        print(x_p_plot[:, 0])
 
         # with np.printoptions(threshold=50):
         #   print("True x: ", batch_x)

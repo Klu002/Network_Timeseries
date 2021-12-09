@@ -6,7 +6,7 @@ import torch
 import math
 import time
 
-from data.preprocess import LoadInput, read_data, get_rows, load_median_interpolation
+from data.preprocess import LoadInput, read_data, get_rows, load_average_interpolation, load_median_interpolation
 from models.vae import ODEVAE
 
 def submission_data_to_df(file_path, start_row, num_rows=100000):
@@ -34,12 +34,15 @@ def get_submission_timesteps(df, start_date="2015-07-01"):
 
 def generate_predictions(device, model, training_df, predict_date_range, n_sample, batch_size=1000, use_cuda=False):
     result = {}
+
     training_data = [cn for cn in training_df.columns if cn != 'Page']
     training_data = training_df[training_data].values
-    training_data = training_data[:, training_data.shape[1] - n_sample:]
-    training_data, _, _ = load_median_interpolation(training_data, None, None)
-        
-    training_times = torch.arange(0, training_data.shape[0], dtype=torch.float32)
+    time_len = training_data.shape[1]
+
+    training_data = training_data[:, time_len - n_sample:]
+    training_data, _, _ = load_average_interpolation(training_data, None, None)
+
+    training_times = torch.arange(time_len - n_sample, time_len, dtype=torch.float32)
 
     num_batches = math.ceil(training_data.shape[1]/batch_size)
     print("Num batches: {}\n".format(num_batches))
@@ -50,24 +53,24 @@ def generate_predictions(device, model, training_df, predict_date_range, n_sampl
         if (i * batch_size) + batch_size > training_data.shape[1]:
             batch_size = training_data.shape[1]
         
-        batch_x = get_rows(training_data, (i * batch_size), batch_size, len(training_data) - n_sample, n_sample) 
-        batch_t_encoder = training_times[len(training_data) - n_sample:]
+        batch_x = get_rows(training_data, (i * batch_size), batch_size, 0, n_sample)
+        batch_t_encoder = training_times
         batch_t_encoder = batch_t_encoder.repeat(batch_x.shape[1], 1).permute(1, 0).unsqueeze(2)
-
-        batch_t_decoder = torch.arange(predict_date_range[0], predict_date_range[1], 1).float()
+        
+        batch_t_decoder = torch.arange(time_len - n_sample, predict_date_range[1], 1).float()
         batch_t_decoder = batch_t_decoder.repeat(batch_x.shape[1], 1).permute(1, 0).unsqueeze(2)
-
+        
         print("Batch x shape: ", batch_x.shape)
         print("Batch t encoder shape: ", batch_t_encoder.shape)
         print("Batch t decoder shape: ", batch_t_decoder.shape)
 
-        x_p, _, _, _ = model(batch_x, batch_t_encoder, batch_t_decoder)
-        x_p = x_p.squeeze(2).permute(1, 0)
-
-        print("x_p shape: ", x_p.shape)
+        x_p, _, _, _ = model(batch_x, batch_t_encoder, batch_t_encoder)
+        x_p[x_p < 0] = 0
+        print("x_p shape: ", x_p.squeeze(2).permute(1, 0))
+        x_p = x_p.squeeze(2).permute(1, 0)[:, -64:]
         
-        for j in range(i * batch_size, i * batch_size + batch_size):
-            result[training_df['Page'][j]] = x_p[j - (i * batch_size + batch_size)].detach().numpy()
+        for j in range(i * batch_size, (i + 1) * batch_size):
+            result[training_df['Page'].iloc[j]] = x_p[j - (i * batch_size + batch_size)].detach().numpy()
 
         end_time = time.time()
         time_taken = end_time - start_time
@@ -117,7 +120,7 @@ def main():
     output_dim = 1
     hidden_dim = 64
     latent_dim = 6
-    n_sample = 200
+    n_sample = 500
     batch_size = 1000
     device = 'cpu'
     if args.use_cuda:
@@ -144,5 +147,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    
