@@ -80,7 +80,7 @@ class NeuralODEDecoder(nn.Module):
         return xs
 
 class ODEVAE(nn.Module):
-    def __init__(self, output_dim, hidden_dim, latent_dim, encoder='gru'):
+    def __init__(self, output_dim, hidden_dim, latent_dim, encoder='grud'):
         super(ODEVAE, self).__init__()
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
