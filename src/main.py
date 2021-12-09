@@ -231,7 +231,6 @@ def main():
         if 'epoch_idx' in checkpoint:
           epoch_idx = checkpoint['epoch_idx']
         # optim.load_state_dict(checkpoint['optimizer_state_dict'])
-
         # train_data = checkpoint['train_data']
         # val_data = checkpoint['val_data']
         # test_data = checkpoint['test_data']
