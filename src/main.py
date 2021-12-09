@@ -165,7 +165,8 @@ def main():
   parser.add_argument('--model_save_dir', type=str, default=None, help='Path for save checkpoints')
   parser.add_argument('--training_save_dir', type=str, default=None, help='Path for saving model weights while training')
   parser.add_argument('--model_name', type=str, default='ODE', help='Name of model for save checkpoints')
-  
+
+  parser.add_argument('--encoder', type=str, default='gru')
   parser.add_argument('--use_cuda', type=eval, default=False)
   parser.add_argument('--visualize', type=eval, default=False)
   args = parser.parse_args()
@@ -209,7 +210,7 @@ def main():
   val_time = val_time.to(device)
   test_time = test_time.to(device)
 
-  model = ODEVAE(output_dim, hidden_dim, latent_dim).to(device)
+  model = ODEVAE(output_dim, hidden_dim, latent_dim,encoder=args.encoder).to(device)
   optim = torch.optim.Adam(model.parameters(), betas=(0.9, 0.999), lr=lr)
   train_loss_func = train_mae_loss
   test_loss_func = test_smape_loss
