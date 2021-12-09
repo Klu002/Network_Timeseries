@@ -75,18 +75,18 @@ class ODEVAE(nn.Module):
         self.rnn_encoder = RNNEncoder(output_dim, hidden_dim, latent_dim)
         self.neural_decoder = NeuralODEDecoder(output_dim, hidden_dim, latent_dim)
         
-    def forward(self, x, t, MAP=False):
-        mu, logvar = self.rnn_encoder(x, t)
+    def forward(self, x, t_encoder, t_decoder, MAP=False):
+        mu, logvar = self.rnn_encoder(x, t_encoder)
         if MAP:
             z = mu
         else:
             z = reparameterize(mu, logvar)
 
         # x_p = self.neural_decoder(z, t).permute(1, 0, 2)
-        x_p = self.neural_decoder(z, t)
+        x_p = self.neural_decoder(z, t_decoder)
         return x_p, z, mu, logvar
 
-def vae_loss_function(x_p, x, z, mu, logvar):
+def vae_loss_function(device, x_p, x, z, mu, logvar):
     reconstruction_loss = 0.5 * ((x - x_p)**2).sum(-1).sum(0)
     kl_loss = -0.5 * torch.sum(1 + logvar - mu**2 - torch.exp(logvar), -1)
     
@@ -127,7 +127,7 @@ def mae(device, y_true, y_pred, mask):
     y_true_log = torch.log1p(y_true)
     y_pred_log = torch.log1p(y_pred)
     error = torch.abs(y_true_log - y_pred_log)/2
-    
+
     nvalid = torch.sum(mask)
     error_sum = torch.sum(error * mask) / nvalid
     return error_sum

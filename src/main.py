@@ -44,7 +44,7 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
         batch_x, batch_t = batch_x[permutation], batch_t[permutation]
         batch_x, batch_t = batch_x.to(device), batch_t.to(device)
 
-        x_p, z, z_mean, z_log_var = model(batch_x, batch_t)
+        x_p, z, z_mean, z_log_var = model(batch_x, batch_t, batch_t)
         x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
         x_p[x_p < 0] = 0
 
