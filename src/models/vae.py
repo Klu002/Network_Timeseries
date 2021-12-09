@@ -14,7 +14,7 @@ from GRU_D import GRUD_cell
 np.set_printoptions(threshold=500)
 
 class RNNEncoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim, encoder='gru'):
+    def __init__(self, input_dim, hidden_dim, latent_dim, encoder='grud'):
         super(RNNEncoder, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
