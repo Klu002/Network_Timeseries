@@ -24,7 +24,7 @@ def plot_versus(x, x_p, x_start, x_end, save_path):
   plt.clf()
 
 # TODO: Use cuda device instead of doing everything on CPU
-def train(device, model, optimizer, train_loss_func, test_loss_func, train_data, train_time, learning_rate, batch_size, epoch_idx, epochs, n_sample, ckpt_path=None, use_cuda=False):  
+def train(device, model, optimizer, train_loss_func, test_loss_func, train_data, train_time, learning_rate, batch_size, epoch_idx, epochs, n_sample, ckpt_path=None, use_cuda=False):
   epoch_losses = []
   for epoch_idx in range(epoch_idx, epochs):
     losses = []
@@ -99,12 +99,12 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
         'losses': epoch_losses,
       }, ckpt_path + '_' + str(epoch_idx + 1) + '.pth')
       print('Saved model at {}'.format(ckpt_path + '_' + str(epoch_idx + 1) + '.pth'))
-    
+
     print("Epoch {}/{}".format(epoch_idx + 1, epochs))
     print("mean differentiable_smape: {} - median differentiable_smape: {}\n".format(np.mean(losses), np.median(losses)))
 
   return epoch_idx + 1, epoch_losses
-    
+
 # class RunningAverageMeter(object):
 #   """Computes and stores the average and current value"""
 
@@ -179,7 +179,7 @@ def main():
 
     # Saves data
     np.save('../data/processed/page_views.npy', df[dates].values)
-    
+
   if args.load_dir:
     print('Loading data from file...')
     data_path = args.load_dir
@@ -197,10 +197,8 @@ def main():
   lr = args.lr
   batch_size = args.batch_size
   n_sample = args.n_sample
-  device = 'cpu'
-  if args.use_cuda:
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-  
+  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
   print("Using device: ", device)
 
   train_data = train_data.to(device)
@@ -260,7 +258,7 @@ def main():
         'num_epochs': epochs,
         'losses': losses
       }, ckpt_path + '_' + str(trained_epochs) + '.pth')
-      
+
     if trained_epochs < epochs:
       done_training = False
   else:
@@ -287,6 +285,6 @@ def main():
 
   # TODO: if args.visualize, plot figures here
 
-  
+
 if __name__ == '__main__':
   main()
