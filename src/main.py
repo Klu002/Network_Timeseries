@@ -9,7 +9,7 @@ import os
 import argparse
 import time
 from models.vae import ODEVAE, train_smape_loss, train_mae_loss, test_smape_loss, vae_loss_function
-from data.preprocess import LoadInput, read_data, gen_batch
+from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_time
 
 np.set_printoptions(threshold=500)
 
@@ -166,8 +166,8 @@ def main():
     ld = LoadInput(data_path)
     train_data, val_data, test_data = ld.split_train_val_test()
 
-    train_data, val_data, test_data = ld.load_median_interpolation(train_data, val_data, test_data)
-    train_time, val_time, test_time = ld.load_time(train_data, val_data, test_data)
+    train_data, val_data, test_data = load_median_interpolation(train_data, val_data, test_data)
+    train_time, val_time, test_time = load_time(train_data, val_data, test_data)
 
   output_dim = 1
   hidden_dim = 64

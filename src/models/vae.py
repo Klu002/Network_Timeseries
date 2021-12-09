@@ -10,7 +10,7 @@ from torch.autograd import Variable
 from models.ode_funcs import ODEFunc, NeuralODE
 from models.spirals import NNODEF
 from helpers.utils import reparameterize, call_gru_d
-from GRU_D import GRUD_cell
+from models.GRU_D import GRUD_cell
 np.set_printoptions(threshold=500)
 
 class RNNEncoder(nn.Module):
