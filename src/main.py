@@ -56,6 +56,7 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
 
         x_p, z, z_mean, z_log_var = model(batch_x, batch_t, batch_t)
         x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
+        x_p = torch.round(x_p)
         x_p[x_p < 0] = 0
 
         if i % 20 == 0:
@@ -65,7 +66,7 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
           x_start = x_values[:, 0][0]
           x_end = x_values[:, 0][-1]
 
-          plot_versus(batch_x_plot[:, 0], x_p_plot[:, 0], x_start, x_end, '../saved/images/ODE_GRU_MAE_epoch_{}_batch_{}'.format(epoch_idx, i))
+          plot_versus(batch_x_plot[:, 0], x_p_plot[:, 0], x_start, x_end, '../saved/images/ODE_GRU_SMAPE_200_time_steps_epoch_{}_batch_{}'.format(epoch_idx, i))
 
         # with np.printoptions(threshold=50):
         #   print("True x: ", batch_x)
@@ -230,18 +231,14 @@ def main():
         model.load_state_dict(checkpoint['model_state_dict'])
         if 'epoch_idx' in checkpoint:
           epoch_idx = checkpoint['epoch_idx']
-        # optim.load_state_dict(checkpoint['optimizer_state_dict'])
-        # train_data = checkpoint['train_data']
-        # val_data = checkpoint['val_data']
-        # test_data = checkpoint['test_data']
-        # train_time = checkpoint['train_time']
-        # val_time = checkpoint['val_time']
-        # test_time = checkpoint['test_time']
         # epochs = checkpoint['args'].epochs
         # lr = checkpoint['args'].lr
         # batch_size = checkpoint['args'].batch_size
         # n_sample = checkpoint['args'].n_sample
-
+        last_epoch_saved = ckpt_path[:-4].rsplit("_", 1)
+        if last_epoch_saved[1].isnumeric():
+          args.model_name = last_epoch_saved[0]
+          print("Model name changed to: ", args.model_name)
         print('Loaded checkpoint from {}'.format(ckpt_path))
 
   # orig_trajs, samp_trajs, samp_ts = generate_spirals()
@@ -259,6 +256,7 @@ def main():
         'num_epochs': epochs,
         'losses': losses
       }, ckpt_path + '_' + str(trained_epochs) + '.pth')
+      print('Interrupted model training - saved checkpoint to {}'.format(ckpt_path))
       
     if trained_epochs < epochs:
       done_training = False
