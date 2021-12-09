@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import torch
+import pandas as pd
 from data.preprocess import mape, differentiable_smape, rounded_smape, kaggle_smape, mae, mse
 
 # sns.set_theme(style="darkgrid")
@@ -46,6 +47,22 @@ def visualize_loss_history(dir_path, model_name, save_dir=None):
     if save_dir:
         plt.savefig(save_dir + "/" + model_name + "loss_history")
     plt.show()
+
+def plot_webtraffic_data(data, opt='first_n', save_dir=None, show=True, n=10):
+    "Data is of form [num_timesx[site_name, activity], time]"
+    site_info = data[0]
+    time = data[1]
+    site_names = site_info[:, 0]
+    activity = site_info[:, -1:]
+    if opt == "first_n":
+        for i in range(n):
+            plt.plot(time, activity[i, :], label = site_names[i])
+        if save_dir:
+            plt.savefig(save_dir)
+        if show:
+            plt.show()
+
+
 
 if __name__ == "__main__":
     pass
