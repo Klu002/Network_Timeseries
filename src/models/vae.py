@@ -116,7 +116,7 @@ def mean_absolute_percentage_error(device, y_true, y_pred):
 def differentiable_smape(device, y_true, y_pred, epsilon=0.1):
     constant_and_epsilon = torch.tensor(0.5 + epsilon).repeat(y_true.shape).to(device)
     summ = torch.maximum(torch.abs(y_true) + torch.abs(y_pred) + epsilon, constant_and_epsilon)
-    smape = (torch.abs(y_pred - y_true) / summ)
+    smape = (torch.abs(y_pred - y_true) / summ * 2.0)
 
     return torch.mean(smape)
 
