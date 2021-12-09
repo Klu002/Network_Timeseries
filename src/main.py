@@ -53,11 +53,12 @@ def train(device, model, optimizer, train_loss_func, test_loss_func, train_data,
 
         batch_x, batch_t = batch_x[permutation], batch_t[permutation]
         batch_x, batch_t = batch_x.to(device), batch_t.to(device)
-
+        print("before model")
         x_p, z, z_mean, z_log_var = model(batch_x, batch_t, batch_t)
         x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
         x_p = torch.round(x_p)
         x_p[x_p < 0] = 0
+        print("after model")
 
         if i % 20 == 0:
           batch_x_plot = np.squeeze(batch_x.detach().cpu().numpy(), 2)
@@ -186,7 +187,6 @@ def main():
     data_path = args.load_dir
     ld = LoadInput(data_path)
     train_data, _, _ = ld.split_train_val_test(1, 0, 0)
-
     train_data, _, _ = load_median_interpolation(train_data, None, None)
     train_time, _, _ = load_time(train_data, None, None)
 
@@ -204,8 +204,7 @@ def main():
 
   train_data = train_data.to(device)
   # val_data = val_data.to(device)
-  # test_data = test_data.to(device)
-  train_time = train_time.to(device)
+  # test_data = test_data.to(device) train_time = train_time.to(device)
   # val_time = val_time.to(device)
   # test_time = test_time.to(device)
 
@@ -254,12 +253,8 @@ def main():
         'num_epochs': epochs,
         'losses': losses
       }, ckpt_path + '_' + str(trained_epochs) + '.pth')
-<<<<<<< HEAD
-
-=======
       print('Interrupted model training - saved checkpoint to {}'.format(ckpt_path))
       
->>>>>>> 5a282874cf5d1d9d0cd8b9614f775c6201f707fa
     if trained_epochs < epochs:
       done_training = False
   else:
