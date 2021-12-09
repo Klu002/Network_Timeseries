@@ -22,8 +22,10 @@ class LoadInput:
         test_data = []
         for data in self.loaded_data:
             train_data.append(data[:int(len(data) * train_size)])
-            val_data.append(data[int(len(data) * train_size):int(len(data) * (train_size + val_size))])
-            test_data.append(data[int(len(data) * (train_size + val_size)):])
+            if val_size != 0:
+                val_data.append(data[int(len(data) * train_size):int(len(data) * (train_size + val_size))])
+            if test_size != 0:
+                test_data.append(data[int(len(data) * (train_size + val_size)):])
         return train_data, val_data, test_data
     
 def remove_percent_nan_values(data, percent):
