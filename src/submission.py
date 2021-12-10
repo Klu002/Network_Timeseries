@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import math
 import time
+import csv
+import pickle
 
 from data.preprocess import LoadInput, read_data, get_rows, load_average_interpolation, load_median_interpolation
 from models.vae import ODEVAE
@@ -34,16 +36,16 @@ def get_submission_timesteps(df, start_date="2015-07-01"):
 
 def generate_predictions(device, model, training_df, predict_date_range, n_sample, batch_size=1000, use_cuda=False):
     result = {}
-    predict_date_diff = predict_date_range[1] - predict_date_range[0]
+    predict_date_diff = predict_date_range[1] - predict_date_range[0] + 1
 
     training_data = [cn for cn in training_df.columns if cn != 'Page']
     training_data = training_df[training_data].values
     time_len = training_data.shape[1]
 
-    training_data = training_data[:, time_len - n_sample - predict_date_diff:]
-    training_data, _, _ = load_median_interpolation(training_data, None, None)
+    training_data = training_data[:, time_len - (n_sample - predict_date_diff):]
+    training_data, _, _ = load_median_interpolation(training_data, None, None, 0)
 
-    training_times = torch.arange(time_len - n_sample - predict_date_diff, time_len, dtype=torch.float32)
+    training_times = torch.arange(time_len - (n_sample - predict_date_diff), time_len, dtype=torch.float32)
 
     num_batches = math.ceil(training_data.shape[1]/batch_size)
     print("Num batches: {}\n".format(num_batches))
@@ -51,27 +53,18 @@ def generate_predictions(device, model, training_df, predict_date_range, n_sampl
     for i in range(num_batches):
         start_time = time.time()
         
-        if (i * batch_size) + batch_size > training_data.shape[1]:
-            batch_size = training_data.shape[1]
-        
         end_batch_idx = (i + 1) * batch_size
         if end_batch_idx >= training_data.shape[1]:
             end_batch_idx = training_data.shape[1]
-        
-        print("Check 1")
-        batch_x = training_data[:, i * batch_size:end_batch_idx]
-        print("Check 1")
+            batch_x = training_data[:, i * batch_size:]
+        else:
+            batch_x = training_data[:, i * batch_size:end_batch_idx]
+
         batch_t_encoder = training_times
-        # print(batch_t_encoder.shape)
-        batch_t_encoder = batch_t_encoder.repeat(batch_t_encoder.shape[0], 1).permute(1, 0).unsqueeze(2)
-        print("Check 1")
+        batch_t_encoder = batch_t_encoder.repeat(batch_x.shape[1], 1).permute(1, 0).unsqueeze(2)
         
-        batch_t_decoder = torch.arange(time_len - n_sample - predict_date_diff, predict_date_range[1], 1).float()
+        batch_t_decoder = torch.arange(time_len - (n_sample - predict_date_diff), predict_date_range[1], 1).float()
         batch_t_decoder = batch_t_decoder.repeat(batch_x.shape[1], 1).permute(1, 0).unsqueeze(2)
-        
-        print(batch_x.shape)
-        print(batch_t_encoder.shape)
-        print(batch_t_decoder.shape)
         
         x_p, _, _, _ = model(batch_x, batch_t_encoder, batch_t_decoder)
         x_p = torch.round(x_p)
@@ -79,8 +72,8 @@ def generate_predictions(device, model, training_df, predict_date_range, n_sampl
 
         x_p = x_p.squeeze(2).permute(1, 0)[:, -64:]
         
-        for j in range(i * batch_size, (i + 1) * batch_size):
-            result[training_df['Page'].iloc[j]] = x_p[j - ((i + 1) * batch_size)].detach().numpy()
+        for j in range(i * batch_size, end_batch_idx):
+            result[training_df['Page'].iloc[j]] = x_p[j - end_batch_idx].detach().numpy()
 
         end_time = time.time()
         time_taken = end_time - start_time
@@ -115,10 +108,13 @@ def main():
 
     if args.submission_dir:
         submission_df = pd.read_csv(args.submission_dir)
+        # submission_df2 = pd.read_csv('../data/raw/key_1.csv')
+        # submission_df = pd.concat([submission_df, submission_df2])
         submission_df = get_submission_timesteps(submission_df)
         # End index for date range is exclusive
         date_range = [submission_df['Time'].min(), submission_df['Time'].max() + 1]
-        training_df = training_df[training_df['Page'].isin(submission_df['Page'].unique())]
+        training_df = training_df.merge(submission_df['Page'].drop_duplicates(), on=['Page'], how='right')
+        # training_df = training_df[training_df['Page'].isin(submission_df['Page'].unique())]
     else:
         print('No submission data found. Exiting...')
         exit()
@@ -132,7 +128,7 @@ def main():
     device = 'cpu'
     if args.use_cuda:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+
     print("Using device: ", device)
 
     if args.model_save_dir and args.model_name:
@@ -154,7 +150,22 @@ def main():
 
     # test_time = torch.tensor(submission_df['Time'].values).to(device)
     predictions = generate_predictions(device, model, training_df, date_range, n_sample, batch_size)
-
+    
+    result = []
+    for page, id, predict_time in zip(submission_df['Page'], submission_df['Id'], submission_df['Time']):
+        all_values = predictions[page]
+        result.append({'Id': id, 'Visits': int(all_values[predict_time - training_df.shape[1]])})
+    
+    fields = ['Id', 'Visits']
+    idx = 1
+    filename = '../saved/kaggle_submission/submission_{}.csv'.format(idx)
+    with open(filename, 'w') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames = fields)
+        writer.writeheader()
+        for data in result:
+            writer.writerow(data)
+    
+    print('Predicted times by ID saved to {}'.format(filename))
 
 if __name__ == "__main__":
     main()

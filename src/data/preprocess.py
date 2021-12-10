@@ -29,18 +29,20 @@ class LoadInput:
         return train_data, val_data, test_data
     
 def remove_percent_nan_values(data, percent):
-    percent_nan_per_row = np.isnan(data).sum(1)/data.shape[1]
-    data = data[percent_nan_per_row < percent]
+    if percent > 0:
+        percent_nan_per_row = np.isnan(data).sum(1)/data.shape[1]
+        data = data[percent_nan_per_row < percent]
 
     return data
 
-def load_zero_interpolation(train_data, val_data, test_data):
+def load_zero_interpolation(train_data, val_data, test_data, drop_percent=0.1):
     """
     Load the data into the model reshapes it into [page_views, batch_size, features] and
     replaces nan values with 0
     """
     if train_data is not None:
         train_data = np.array(train_data)
+        train_data = remove_percent_nan_values(train_data, drop_percent)
         train_data = np.expand_dims(train_data, axis=2)
         train_data = torch.tensor(train_data)
         train_data = train_data.permute(1, 0, 2)
@@ -48,6 +50,7 @@ def load_zero_interpolation(train_data, val_data, test_data):
 
     if val_data is not None:
         val_data = np.array(val_data)
+        train_data = remove_percent_nan_values(train_data, drop_percent)
         val_data = np.expand_dims(val_data, axis=2)
         val_data = torch.tensor(val_data)
         val_data = val_data.permute(1, 0, 2)
@@ -55,6 +58,7 @@ def load_zero_interpolation(train_data, val_data, test_data):
 
     if test_data is not None:
         test_data = np.array(test_data)
+        train_data = remove_percent_nan_values(train_data, drop_percent)
         test_data = np.expand_dims(test_data, axis=2)
         test_data = torch.tensor(test_data)
         test_data = test_data.permute(1, 0, 2)
@@ -62,14 +66,14 @@ def load_zero_interpolation(train_data, val_data, test_data):
 
     return train_data, val_data, test_data
 
-def load_average_interpolation(train_data, val_data, test_data):
+def load_average_interpolation(train_data, val_data, test_data, drop_percent=0.1):
     """
     Load the data into the model reshapes it into [page_views, batch_size, features] and\
     replaces nan values with the average value
     """
     if train_data is not None:
         train_data = np.array(train_data)
-        train_data = remove_percent_nan_values(train_data, 0.1)
+        train_data = remove_percent_nan_values(train_data, drop_percent)
         train_data = np.where(np.isnan(train_data), np.ma.array(train_data, mask=np.isnan(train_data)).mean(axis=1)[:, np.newaxis], train_data)
         train_data = np.expand_dims(train_data, axis=2)
         train_data = torch.tensor(train_data)
@@ -77,7 +81,7 @@ def load_average_interpolation(train_data, val_data, test_data):
 
     if val_data is not None:
         val_data = np.array(val_data)
-        val_data = remove_percent_nan_values(val_data, 0.1)
+        val_data = remove_percent_nan_values(val_data, drop_percent)
         val_data = np.where(np.isnan(val_data), np.ma.array(val_data, mask=np.isnan(val_data)).mean(axis=1)[:, np.newaxis], val_data)
         val_data = np.expand_dims(val_data, axis=2)
         val_data = torch.tensor(val_data)
@@ -85,7 +89,7 @@ def load_average_interpolation(train_data, val_data, test_data):
 
     if test_data is not None:
         test_data = np.array(test_data)
-        test_data = remove_percent_nan_values(test_data, 0.1)
+        test_data = remove_percent_nan_values(test_data, drop_percent)
         test_data = np.where(np.isnan(test_data), np.ma.array(test_data, mask=np.isnan(test_data)).mean(axis=1)[:, np.newaxis], test_data)
         test_data = np.expand_dims(test_data, axis=2)
         test_data = torch.tensor(test_data)
@@ -134,7 +138,7 @@ def load_median_interpolation(train_data, val_data, test_data):
     """
     if train_data is not None:
         train_data = np.array(train_data)
-        train_data = remove_percent_nan_values(train_data, 0.1)
+        train_data = remove_percent_nan_values(train_data, drop_percent)
         median = np.ma.median(np.ma.array(train_data, mask=np.isnan(train_data)), axis=1)
         train_data = np.where(np.isnan(train_data), median[:, np.newaxis], train_data) 
         train_data = np.expand_dims(train_data, axis=2)
@@ -143,7 +147,7 @@ def load_median_interpolation(train_data, val_data, test_data):
 
     if val_data is not None:
         val_data = np.array(val_data)
-        val_data = remove_percent_nan_values(val_data, 0.1)
+        val_data = remove_percent_nan_values(val_data, drop_percent)
         median = np.ma.median(np.ma.array(val_data, mask=np.isnan(val_data)), axis=1)
         val_data = np.where(np.isnan(val_data), median[:, np.newaxis], val_data) 
         val_data = np.expand_dims(val_data, axis=2)
@@ -152,7 +156,7 @@ def load_median_interpolation(train_data, val_data, test_data):
 
     if test_data is not None:
         test_data = np.array(test_data)
-        test_data = remove_percent_nan_values(test_data, 0.1)
+        test_data = remove_percent_nan_values(test_data, drop_percent)
         median = np.ma.median(np.ma.array(test_data, mask=np.isnan(test_data)), axis=1)
         test_data = np.where(np.isnan(test_data), median[:, np.newaxis], test_data)
         test_data = np.expand_dims(test_data, axis=2)
