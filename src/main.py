@@ -8,21 +8,14 @@ import numpy as np
 import os
 import argparse
 import time
-from models.vae import ODEVAE, train_smape_loss, train_mae_loss, test_smape_loss, vae_loss_function
+from models.vae import ODEVAE, mae, kaggle_smape
 from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_average_interpolation, load_time
+from visualize.visualize import plot_real_vs_pred
 
 import matplotlib.pyplot as plt
 import statistics
 
 np.set_printoptions(threshold=500)
-
-def plot_versus(x, x_p, x_start, x_end, save_path):
-  plt.plot(x, label='True')
-  plt.plot(x_p, label='Pred')
-  plt.xticks(np.arange(x_start, x_end, 25))
-  plt.legend()
-  plt.savefig(save_path)
-  plt.clf()
 
 # TODO: Use cuda device instead of doing everything on CPU
 def train(device, model_name, model, optimizer, train_loss_func, test_loss_func, train_data, train_time, learning_rate, batch_size, epoch_idx, epochs, n_sample, ckpt_path=None, use_cuda=False):
@@ -47,12 +40,13 @@ def train(device, model_name, model, optimizer, train_loss_func, test_loss_func,
         batch_x, batch_t = gen_batch(train_data, train_time, batch_indices, n_sample)
         # print("Batch shape: ", batch_x.shape, batch_t.shape)
 
-        max_len = np.random.randint(batch_t.shape[1]//2, batch_t.shape[1])
-        permutation = np.random.permutation(batch_t.shape[0])
-        np.random.shuffle(permutation)
-        permutation = np.sort(permutation[:max_len])
+        # Should be be doing part below since we already interpolate???
+        # max_len = np.random.randint(batch_t.shape[1]//2, batch_t.shape[1])
+        # permutation = np.random.permutation(batch_t.shape[0])
+        # np.random.shuffle(permutation)
+        # permutation = np.sort(permutation[:max_len])
 
-        batch_x, batch_t = batch_x[permutation], batch_t[permutation]
+        # batch_x, batch_t = batch_x[permutation], batch_t[permutation]
         batch_x, batch_t = batch_x.to(device), batch_t.to(device)
         
         x_p, z, z_mean, z_log_var = model(batch_x, batch_t, batch_t)
@@ -67,9 +61,8 @@ def train(device, model_name, model, optimizer, train_loss_func, test_loss_func,
           x_start = x_values[:, 0][0]
           x_end = x_values[:, 0][-1]
 
-          plot_versus(batch_x_plot[:, 0], x_p_plot[:, 0], x_start, x_end, '../saved/images/{}_epoch_{}_batch_{}'.format(model_name, epoch_idx, i))
+          plot_real_vs_pred(batch_x_plot[:, 0], x_p_plot[:, 0], x_start, x_end, '../saved/images/{}_epoch_{}_batch_{}'.format(model_name, epoch_idx, i))
 
-        # with np.printoptions(threshold=50):
         #   print("True x: ", batch_x)
         #   print("Pred x: ", x_p)
         # If loss function = SMAPE, don't have to divide by max_len. 
@@ -99,6 +92,7 @@ def train(device, model_name, model, optimizer, train_loss_func, test_loss_func,
     if epoch_idx > 0 and epoch_idx % 1 == 0 and ckpt_path:
       torch.save({
         'model_state_dict': model.state_dict(),
+        'encoder': model.encoder,
         'epoch_idx': epoch_idx,
         'num_epochs': epochs,
         'losses': epoch_losses,
@@ -194,6 +188,7 @@ def main():
   print("Using device: ", device)
 
   train_data = train_data.to(device)
+  train_time = train_time.to(device)
   # val_data = val_data.to(device)
   # test_data = test_data.to(device) train_time = train_time.to(device)
   # val_time = val_time.to(device)
@@ -201,8 +196,8 @@ def main():
 
   model = ODEVAE(output_dim, hidden_dim, latent_dim, encoder=args.encoder).to(device)
   optim = torch.optim.Adam(model.parameters(), betas=(0.9, 0.999), lr=lr)
-  train_loss_func = train_mae_loss
-  test_loss_func = test_smape_loss
+  train_loss_func = mae
+  test_loss_func = kaggle_smape
   # loss_func = vae_loss_function
   # loss_meter = RunningAverageMeter()
 
@@ -219,6 +214,8 @@ def main():
         model.load_state_dict(checkpoint['model_state_dict'])
         if 'epoch_idx' in checkpoint:
           epoch_idx = checkpoint['epoch_idx']
+        if 'encoder' in checkpoint:
+          args.encoder = checkpoint['encoder']
         # epochs = checkpoint['args'].epochs
         # lr = checkpoint['args'].lr
         # batch_size = checkpoint['args'].batch_size
@@ -240,6 +237,7 @@ def main():
     if trained_epochs > 0 and trained_epochs < epochs:
       torch.save({
         'model_state_dict': model.state_dict(),
+        'encoder': args.encoder,
         'epoch_idx': trained_epochs - 1,
         'num_epochs': epochs,
         'losses': losses
