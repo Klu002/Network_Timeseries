@@ -1,9 +1,18 @@
 import seaborn as sb
 import matplotlib.pyplot as plt
+import numpy as np
 
-from data.preprocess import mape, differentiable_smape, rounded_smape, kaggle_smape, mae, mse
+from models.vae import mape, differentiable_smape, rounded_smape, kaggle_smape, mae, mse
 
 # sns.set_theme(style="darkgrid")
+
+def plot_real_vs_pred(x, x_p, x_start, x_end, save_path):
+  plt.plot(x, label='True')
+  plt.plot(x_p, label='Pred')
+  plt.xticks(np.arange(x_start, x_end, 25))
+  plt.legend()
+  plt.savefig(save_path)
+  plt.clf()
 
 # TODO: Add way to visualize the loss functions against each other
 # (both near 0 and in general)
