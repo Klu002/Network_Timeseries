@@ -5,6 +5,7 @@ import torch
 from torch import Tensor
 from torch import nn
 from torch.autograd import Variable
+import time
 
 # from models.ode_funcs import NeuralODE, ODEFunc
 from models.ode_funcs import ODEFunc, NeuralODE
@@ -81,11 +82,12 @@ class NeuralODEDecoder(nn.Module):
         return xs
 
 class ODEVAE(nn.Module):
-    def __init__(self, output_dim, hidden_dim, latent_dim, encoder='grud'):
+    def __init__(self, output_dim, hidden_dim, latent_dim, encoder='gru'):
         super(ODEVAE, self).__init__()
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
+        self.encoder = encoder
 
         self.rnn_encoder = RNNEncoder(output_dim, hidden_dim, latent_dim, encoder=encoder)
         self.neural_decoder = NeuralODEDecoder(output_dim, hidden_dim, latent_dim)
@@ -96,7 +98,6 @@ class ODEVAE(nn.Module):
             z = mu
         else:
             z = reparameterize(mu, logvar)
-
         # x_p = self.neural_decoder(z, t).permute(1, 0, 2)
         x_p = self.neural_decoder(z, t_decoder)
         return x_p, z, mu, logvar
@@ -148,20 +149,20 @@ def mse(device, y_true, y_pred, mult_factor=1):
 
     return torch.mean(error)
 
-def train_smape_loss(device, y_true, y_pred):
-    # mask = torch.isfinite(y_true).to(device)
-    # weight_mask = mask.type(torch.FloatTensor)
+# def train_smape_loss(device, y_true, y_pred):
+#     mask = torch.isfinite(y_true).to(device)
+#     weight_mask = mask.type(torch.FloatTensor)
 
-    return differentiable_smape(device, y_true, y_pred)
+#     return differentiable_smape(device, y_true, y_pred)
 
-def train_mae_loss(device, y_true, y_pred):
-    # mask = torch.isfinite(y_true).to(device)
-    # weight_mask = mask.type(torch.FloatTensor)
+# def train_mae_loss(device, y_true, y_pred):
+#     mask = torch.isfinite(y_true).to(device)
+#     weight_mask = mask.type(torch.FloatTensor)
 
-    return mae(device, y_true, y_pred)
+#     return mae(device, y_true, y_pred)
 
-def test_smape_loss(device, y_true, y_pred):
-    # mask = torch.isfinite(y_true).to(device)
-    # weight_mask = mask.type(torch.FloatTensor)
+# def test_smape_loss(device, y_true, y_pred):
+#     mask = torch.isfinite(y_true).to(device)
+#     weight_mask = mask.type(torch.FloatTensor)
 
-    return kaggle_smape(device, y_true, y_pred)
+#     return kaggle_smape(device, y_true, y_pred)
