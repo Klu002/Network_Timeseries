@@ -254,12 +254,8 @@ def main():
         'num_epochs': epochs,
         'losses': losses
       }, ckpt_path + '_' + str(trained_epochs) + '.pth')
-<<<<<<< HEAD
-
-=======
       print('Interrupted model training - saved checkpoint to {}'.format(ckpt_path))
       
->>>>>>> 5a282874cf5d1d9d0cd8b9614f775c6201f707fa
     if trained_epochs < epochs:
       done_training = False
   else:
