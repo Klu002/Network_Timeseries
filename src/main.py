@@ -12,6 +12,7 @@ from models.vae import ODEVAE, train_smape_loss, train_mae_loss, test_smape_loss
 from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_average_interpolation, load_time
 
 import matplotlib.pyplot as plt
+import statistics
 
 np.set_printoptions(threshold=500)
 
@@ -53,6 +54,7 @@ def train(device, model_name, model, optimizer, train_loss_func, test_loss_func,
 
         batch_x, batch_t = batch_x[permutation], batch_t[permutation]
         batch_x, batch_t = batch_x.to(device), batch_t.to(device)
+        
         x_p, z, z_mean, z_log_var = model(batch_x, batch_t, batch_t)
         x_p, z, z_mean, z_log_var = x_p.to(device), z.to(device), z_mean.to(device), z_log_var.to(device)
         x_p = torch.round(x_p)
@@ -170,7 +172,10 @@ def main():
     data_path = args.load_dir
     ld = LoadInput(data_path)
     train_data, _, _ = ld.split_train_val_test(1, 0, 0)
-    train_data, _, _ = load_average_interpolation(train_data, None, None)
+    # print("Original Mean: ", np.nanmean(train_data[-1]))
+    train_data, _, _ = load_median_interpolation(train_data, None, None)
+    # print("New mean: ", torch.mean(train_data[:, -1, :]))
+    # print("Medians equal: ", torch.tensor(np.nanmedian(train_data, axis = 1)) == torch.median(train_data_med.squeeze().permute(1, 0), axis = 1))
     train_time, _, _ = load_time(train_data, None, None)
 
   output_dim = 1
