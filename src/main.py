@@ -62,7 +62,6 @@ def train(device, model_name, model, optimizer, train_loss_func, test_loss_func,
 
           plot_real_vs_pred(batch_x_plot[:, 0], x_p_plot[:, 0], x_start, x_end, '../saved/images/{}_epoch_{}_batch_{}'.format(model_name, epoch_idx, i))
 
-        # with np.printoptions(threshold=50):
         #   print("True x: ", batch_x)
         #   print("Pred x: ", x_p)
         # If loss function = SMAPE, don't have to divide by max_len. 
