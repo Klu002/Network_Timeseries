@@ -9,7 +9,7 @@ import os
 import argparse
 import time
 from models.vae import ODEVAE, mae, kaggle_smape
-from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_time
+from data.preprocess import LoadInput, read_data, gen_batch, load_median_interpolation, load_average_interpolation, load_time
 from visualize.visualize import plot_real_vs_pred
 
 import matplotlib.pyplot as plt
@@ -76,7 +76,6 @@ def train(device, model_name, model, optimizer, train_loss_func, test_loss_func,
 
         mae_loss.backward()
         optimizer.step()
-
         losses.append(mae_loss.item())
 
         end_time = time.time()
@@ -167,7 +166,7 @@ def main():
     data_path = args.load_dir
     ld = LoadInput(data_path)
     train_data, _, _ = ld.split_train_val_test(1, 0, 0)
-    train_data, _, _ = load_median_interpolation(train_data, None, None)
+    train_data, _, _ = load_average_interpolation(train_data, None, None)
     train_time, _, _ = load_time(train_data, None, None)
 
   output_dim = 1
